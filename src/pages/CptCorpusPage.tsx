@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Brain, FileText } from 'lucide-react'
+import { ArrowLeft, Brain, FileText } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
@@ -18,9 +18,10 @@ import type { CptCorpusDataset } from '@/types/dataset'
 interface CptCorpusPageProps {
   onOpenCorpus: (id: string) => void
   onOpenTrainingJob: (jobId: string) => void
+  onNavigate: (id: string) => void
 }
 
-export function CptCorpusPage({ onOpenCorpus, onOpenTrainingJob }: CptCorpusPageProps) {
+export function CptCorpusPage({ onOpenCorpus, onOpenTrainingJob, onNavigate }: CptCorpusPageProps) {
   const { cptDatasets } = useDataCenter()
   const { state, update, clear } = useDatasetBrowserState('dataset-browser.cpt')
   const [loading, setLoading] = useState(true)
@@ -57,17 +58,23 @@ export function CptCorpusPage({ onOpenCorpus, onOpenTrainingJob }: CptCorpusPage
             <h1 className="mt-2 text-2xl font-semibold">CPT 语料库</h1>
             <p className="mt-1 text-sm text-[var(--color-ink-secondary)]">管理漏洞知识、攻击方法、修复经验与安全领域持续预训练语料</p>
           </div>
-          <label className="flex items-center gap-2 rounded-lg border border-[var(--color-border)] bg-white px-3 py-2 text-sm font-medium">
-            <input
-              type="checkbox"
-              checked={trainingMode}
-              onChange={(event) => {
-                setTrainingMode(event.target.checked)
-                if (!event.target.checked) setSelectedIds([])
-              }}
-            />
-            训练选择模式
-          </label>
+          <div className="flex flex-wrap items-center gap-2">
+            <Button variant="secondary" onClick={() => onNavigate('data-center')}>
+              <ArrowLeft className="h-4 w-4" />
+              返回数据中心
+            </Button>
+            <label className="flex items-center gap-2 rounded-lg border border-[var(--color-border)] bg-white px-3 py-2 text-sm font-medium">
+              <input
+                type="checkbox"
+                checked={trainingMode}
+                onChange={(event) => {
+                  setTrainingMode(event.target.checked)
+                  if (!event.target.checked) setSelectedIds([])
+                }}
+              />
+              训练选择模式
+            </label>
+          </div>
         </div>
 
         <DatasetFilterBar

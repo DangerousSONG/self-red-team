@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Target } from 'lucide-react'
+import { ArrowLeft, Target } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
@@ -16,9 +16,10 @@ import type { BenchmarkDataset } from '@/types/dataset'
 
 interface BenchmarkDatasetsPageProps {
   onOpenBenchmark: (datasetId: string) => void
+  onNavigate: (id: string) => void
 }
 
-export function BenchmarkDatasetsPage({ onOpenBenchmark }: BenchmarkDatasetsPageProps) {
+export function BenchmarkDatasetsPage({ onOpenBenchmark, onNavigate }: BenchmarkDatasetsPageProps) {
   const { benchmarkDatasets } = useDataCenter()
   const { state, update, clear } = useDatasetBrowserState('dataset-browser.benchmark')
   const [loading, setLoading] = useState(true)
@@ -38,13 +39,19 @@ export function BenchmarkDatasetsPage({ onOpenBenchmark }: BenchmarkDatasetsPage
   return (
     <main className="flex-1 overflow-x-hidden px-6 py-5">
       <div className="mx-auto max-w-[1500px] space-y-5 pb-8">
-        <div>
-          <Badge variant="outline">
-            <Target className="h-3.5 w-3.5" />
-            Benchmark Dataset
-          </Badge>
-          <h1 className="mt-2 text-2xl font-semibold">Benchmark 数据集</h1>
-          <p className="mt-1 text-sm text-[var(--color-ink-secondary)]">管理用于漏洞挖掘、漏洞利用与漏洞修复能力评测的标准数据集</p>
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <Badge variant="outline">
+              <Target className="h-3.5 w-3.5" />
+              Benchmark Dataset
+            </Badge>
+            <h1 className="mt-2 text-2xl font-semibold">Benchmark 数据集</h1>
+            <p className="mt-1 text-sm text-[var(--color-ink-secondary)]">管理用于漏洞挖掘、漏洞利用与漏洞修复能力评测的标准数据集</p>
+          </div>
+          <Button variant="secondary" onClick={() => onNavigate('data-center')}>
+            <ArrowLeft className="h-4 w-4" />
+            返回数据中心
+          </Button>
         </div>
 
         <DatasetFilterBar

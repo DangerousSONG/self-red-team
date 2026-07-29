@@ -1,4 +1,5 @@
 import type { AgentProfile, ModelProfile, RangeEnvironment } from '@/types/range'
+import { agentAssets, modelAssets } from '@/lib/mock-data/capability-assets'
 
 export const rangeEnvironments: RangeEnvironment[] = [
   {
@@ -51,81 +52,31 @@ export const rangeEnvironments: RangeEnvironment[] = [
   },
 ]
 
-export const agentProfiles: AgentProfile[] = [
-  {
-    id: 'blackbox-general-agent',
-    name: '通用黑盒攻击智能体',
-    mode: 'Black-box',
-    description: '面向多节点靶场的探测、利用与横向移动智能体。',
-    capabilityTags: ['资产探测', '凭证复用', '横向移动'],
-    successRate: '73%',
-    compatibleTaskTypes: ['enterprise-lateral', 'web-exploit'],
-    recommendationReason: '历史横向移动成功率较高，支持受控入口探测。',
-  },
-  {
-    id: 'greybox-exploit-agent',
-    name: '灰盒漏洞利用智能体',
-    mode: 'Grey-box',
-    description: '面向漏洞沙箱的 PoC 生成与目标验证智能体。',
-    capabilityTags: ['漏洞利用', 'PoC 生成', '目标验证'],
-    successRate: '81%',
-    compatibleTaskTypes: ['web-exploit'],
-    recommendationReason: '与漏洞沙箱任务匹配，支持 ExploitGym 输入输出格式。',
-  },
-  {
-    id: 'whitebox-mining-agent',
-    name: '白盒漏洞挖掘智能体',
-    mode: 'White-box',
-    description: '分析源码、定位漏洞并生成验证脚本。',
-    capabilityTags: ['源码分析', '漏洞定位', '验证脚本'],
-    successRate: '68%',
-    compatibleTaskTypes: ['whitebox-mining'],
-    recommendationReason: '支持白盒源码任务，能产出可执行验证脚本。',
-  },
-  {
-    id: 'whitebox-patch-agent',
-    name: '白盒漏洞修复智能体',
-    mode: 'White-box',
-    description: '生成修复补丁并执行功能与安全验证。',
-    capabilityTags: ['补丁生成', '回归测试', '安全验证'],
-    successRate: '76%',
-    compatibleTaskTypes: ['patch-verify'],
-    recommendationReason: '支持 PatchEval 修复验证流程，预计成本较低。',
-  },
-]
+export const agentProfiles: AgentProfile[] = agentAssets
+  .filter((asset) => asset.status === 'ready')
+  .map((asset) => ({
+    id: asset.id,
+    name: asset.name,
+    mode: agentModeText(asset.type),
+    description: asset.description,
+    capabilityTags: asset.capabilities,
+    successRate: `${asset.successRate ?? 0}%`,
+    compatibleTaskTypes: compatibleTaskTypesForAgent(asset.supportedBenchmarks, asset.supportedEnvironments),
+    recommendationReason: `来自模型与智能体中心 Ready 资产，当前模型为 ${modelAssets.find((model) => model.id === asset.modelAssetId)?.name ?? asset.modelAssetId}。`,
+  }))
 
-export const modelProfiles: ModelProfile[] = [
-  {
-    id: 'mock-internlm',
-    name: 'Mock InternLM',
-    provider: 'Local Mock',
-    contextWindow: '128k',
-    modelType: '通用安全推理',
-    estimatedCost: '约 0.18 元 / 1k tokens',
-    compatibleTaskTypes: ['enterprise-lateral', 'web-exploit', 'whitebox-mining', 'patch-verify'],
-    recommendationReason: '上下文长度充足，覆盖本阶段全部 Mock 任务。',
-  },
-  {
-    id: 'mock-qwen',
-    name: 'Mock Qwen Security',
-    provider: 'Local Mock',
-    contextWindow: '64k',
-    modelType: '灰盒利用',
-    estimatedCost: '约 0.12 元 / 1k tokens',
-    compatibleTaskTypes: ['web-exploit', 'patch-verify'],
-    recommendationReason: '预计成本较低，适合漏洞利用和修复验证。',
-  },
-  {
-    id: 'mock-deepseek',
-    name: 'Mock DeepSeek Coder',
-    provider: 'Local Mock',
-    contextWindow: '64k',
-    modelType: '代码分析',
-    estimatedCost: '约 0.15 元 / 1k tokens',
-    compatibleTaskTypes: ['whitebox-mining', 'patch-verify'],
-    recommendationReason: '代码理解能力更强，适合白盒源码类任务。',
-  },
-]
+export const modelProfiles: ModelProfile[] = modelAssets
+  .filter((asset) => asset.status === 'ready')
+  .map((asset) => ({
+    id: asset.id,
+    name: asset.name,
+    provider: asset.provider,
+    contextWindow: `${Math.round(asset.contextLength / 1000)}k`,
+    modelType: modelTypeText(asset.type),
+    estimatedCost: asset.parameterSize?.includes('35B') ? '约 0.18 元 / 1k tokens' : '约 0.08 元 / 1k tokens',
+    compatibleTaskTypes: compatibleTaskTypesForModel(asset.capabilities, asset.type),
+    recommendationReason: `来自模型与智能体中心 Ready 资产，来源：${modelSourceText(asset.source)}。`,
+  }))
 
 export const defaultResourceMatches: Record<
   string,
@@ -133,22 +84,75 @@ export const defaultResourceMatches: Record<
 > = {
   'enterprise-lateral': {
     environmentId: 'enterprise-lateral-range',
-    agentId: 'blackbox-general-agent',
-    modelId: 'mock-internlm',
+    agentId: 'agent-general-attack',
+    modelId: 'model-shusheng-35b',
   },
   'web-exploit': {
     environmentId: 'exploitgym-sandbox',
-    agentId: 'greybox-exploit-agent',
-    modelId: 'mock-internlm',
+    agentId: 'agent-greybox-exploit',
+    modelId: 'model-shusheng-35b-cyber-cpt-v1',
   },
   'whitebox-mining': {
     environmentId: 'cybergym-sandbox',
-    agentId: 'whitebox-mining-agent',
-    modelId: 'mock-internlm',
+    agentId: 'agent-whitebox-discovery',
+    modelId: 'model-shusheng-35b-cyber-cpt-v1',
   },
   'patch-verify': {
     environmentId: 'patcheval-sandbox',
-    agentId: 'whitebox-patch-agent',
-    modelId: 'mock-internlm',
+    agentId: 'agent-whitebox-patch',
+    modelId: 'model-judge-7b',
   },
+}
+
+function compatibleTaskTypesForAgent(benchmarks: string[], environments: string[]) {
+  const types = new Set<string>()
+  if (benchmarks.includes('CyberGym')) types.add('whitebox-mining')
+  if (benchmarks.includes('ExploitGym')) types.add('web-exploit')
+  if (benchmarks.includes('PatchEval')) types.add('patch-verify')
+  if (benchmarks.includes('自研综合评测集') || environments.some((item) => item.includes('enterprise') || item.includes('database'))) {
+    types.add('enterprise-lateral')
+  }
+  return Array.from(types)
+}
+
+function compatibleTaskTypesForModel(capabilities: string[], type: string) {
+  const text = capabilities.join(' ')
+  const types = new Set<string>(['enterprise-lateral'])
+  if (text.includes('漏洞') || type === 'judge') {
+    types.add('whitebox-mining')
+    types.add('web-exploit')
+  }
+  if (text.includes('补丁') || type === 'judge') types.add('patch-verify')
+  return Array.from(types)
+}
+
+function agentModeText(type: string) {
+  return {
+    general_attack: 'Black-box',
+    whitebox_discovery: 'White-box',
+    greybox_exploitation: 'Grey-box',
+    whitebox_patch: 'White-box',
+    pentest: 'Pentest',
+    defense: 'Defense',
+    judge: 'Judge',
+    tool: 'Tool',
+  }[type] ?? type
+}
+
+function modelTypeText(type: string) {
+  return {
+    foundation: '基础模型',
+    security_enhanced: '安全增强模型',
+    attack: '攻击模型',
+    guard: '守卫模型',
+    judge: '裁判模型',
+  }[type] ?? type
+}
+
+function modelSourceText(source: string) {
+  return {
+    platform: '平台预置',
+    external: '外部接入',
+    training_artifact: '基模训练产物',
+  }[source] ?? source
 }

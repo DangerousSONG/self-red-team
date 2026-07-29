@@ -26,6 +26,8 @@ interface TasksPageProps {
   onNavigate: (id: string) => void
   onDirtyChange?: (dirty: boolean) => void
   onOpenRun?: (runId: string) => void
+  onOpenModel?: (modelId: string) => void
+  onOpenAgent?: (agentId: string) => void
   defaultCategory?: TaskCategory
   onConsumedDefaultCategory?: () => void
 }
@@ -35,7 +37,7 @@ type SaveState = 'saving' | 'saved' | 'failed'
 
 const startupStages = ['封存 CasePlan', '校验资源', '创建 RangeRun', '正在跳转运行控制台']
 
-export function TasksPage({ onNavigate, onDirtyChange, onOpenRun, defaultCategory, onConsumedDefaultCategory }: TasksPageProps) {
+export function TasksPage({ onNavigate, onDirtyChange, onOpenRun, onOpenModel, onOpenAgent, defaultCategory, onConsumedDefaultCategory }: TasksPageProps) {
   const {
     draftProgress,
     setDraftProgress,
@@ -302,6 +304,8 @@ export function TasksPage({ onNavigate, onDirtyChange, onOpenRun, defaultCategor
                     setModelId(id)
                     markChanged()
                   }}
+                  onOpenModel={onOpenModel}
+                  onOpenAgent={onOpenAgent}
                 />
               ) : null}
 

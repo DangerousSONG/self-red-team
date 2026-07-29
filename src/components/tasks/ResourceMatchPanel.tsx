@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import type { ReactNode } from 'react'
-import { Bot, CheckCircle2, Cpu, Search, Server, X } from 'lucide-react'
+import { Bot, CheckCircle2, Cpu, ExternalLink, Search, Server, X } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -19,6 +19,8 @@ interface ResourceMatchPanelProps {
   onEnvironmentChange: (id: string) => void
   onAgentChange: (id: string) => void
   onModelChange: (id: string) => void
+  onOpenModel?: (id: string) => void
+  onOpenAgent?: (id: string) => void
 }
 
 type DrawerType = 'environment' | 'agent' | 'model' | null
@@ -31,6 +33,8 @@ export function ResourceMatchPanel({
   onEnvironmentChange,
   onAgentChange,
   onModelChange,
+  onOpenModel,
+  onOpenAgent,
 }: ResourceMatchPanelProps) {
   const [drawer, setDrawer] = useState<DrawerType>(null)
   const environment = rangeEnvironments.find((item) => item.id === environmentId) ?? rangeEnvironments[0]
@@ -65,6 +69,7 @@ export function ResourceMatchPanel({
           ]}
           reason={agent.recommendationReason}
           onChange={() => setDrawer('agent')}
+          onOpenAsset={() => onOpenAgent?.(agent.id)}
         />
         <ResourceCard
           icon={<Cpu className="h-4 w-4" />}
@@ -77,6 +82,7 @@ export function ResourceMatchPanel({
           ]}
           reason={model.recommendationReason}
           onChange={() => setDrawer('model')}
+          onOpenAsset={() => onOpenModel?.(model.id)}
         />
       </div>
 
@@ -107,6 +113,7 @@ function ResourceCard({
   meta,
   reason,
   onChange,
+  onOpenAsset,
 }: {
   icon: ReactNode
   title: string
@@ -114,6 +121,7 @@ function ResourceCard({
   meta: Array<[string, string]>
   reason: string
   onChange: () => void
+  onOpenAsset?: () => void
 }) {
   return (
     <Card className="h-full">
@@ -130,7 +138,29 @@ function ResourceCard({
         </div>
       </CardHeader>
       <CardContent className="space-y-4">
-        <div className="text-base font-semibold text-[var(--color-ink)]">{name}</div>
+        <div className="flex items-center justify-between gap-2">
+          {onOpenAsset ? (
+            <button
+              type="button"
+              onClick={onOpenAsset}
+              className="text-left text-base font-semibold text-[var(--color-brand)] hover:underline"
+            >
+              {name}
+            </button>
+          ) : (
+            <div className="text-base font-semibold text-[var(--color-ink)]">{name}</div>
+          )}
+          {onOpenAsset ? (
+            <button
+              type="button"
+              onClick={onOpenAsset}
+              className="rounded-md p-1 text-[var(--color-ink-muted)] hover:bg-[var(--color-surface-muted)] hover:text-[var(--color-brand)]"
+              title="查看资产详情"
+            >
+              <ExternalLink className="h-4 w-4" />
+            </button>
+          ) : null}
+        </div>
         <div className="space-y-2">
           {meta.map(([label, value]) => (
             <div key={label} className="rounded-md bg-[var(--color-surface-muted)] px-3 py-2">

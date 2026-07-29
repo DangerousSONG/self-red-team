@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { BarChart3, Brain, Database, FileText, LayoutDashboard, Network, type LucideIcon } from 'lucide-react'
+import { BarChart3, Brain, Database, FileText, LayoutDashboard, Network, Sparkles, type LucideIcon } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useRangeTasks } from '@/hooks/useRangeTasks'
 import { useDataCenter } from '@/hooks/useDataCenter'
@@ -12,6 +12,7 @@ const stageNavItems = [
   { id: 'tasks', label: '评测任务', icon: 'FileText' },
   { id: 'results', label: '评分结果', icon: 'BarChart3' },
   { id: 'data-center', label: '数据中心', icon: 'Database' },
+  { id: 'capability-center', label: '模型与智能体中心', icon: 'Sparkles' },
   { id: 'training', label: '基模训练', icon: 'Brain' },
 ] as const
 
@@ -20,6 +21,7 @@ const iconMap: Record<string, LucideIcon> = {
   FileText,
   BarChart3,
   Database,
+  Sparkles,
   Brain,
 }
 
@@ -46,6 +48,8 @@ export function Sidebar({ activeId, onNavigate, onOpenRun, onOpenTrainingJob }: 
     ? 'results'
     : activeId.startsWith('trajectory') || activeId.startsWith('cpt') || activeId.startsWith('vulnerability') || activeId.startsWith('benchmark')
       ? 'data-center'
+      : activeId === 'capability-center' || activeId === 'models' || activeId === 'model-detail' || activeId === 'agents' || activeId === 'agent-detail'
+        ? 'capability-center'
       : activeId.startsWith('training') || activeId.startsWith('artifact')
         ? 'training'
       : activeId === 'run-detail' || activeId === 'rangerun'

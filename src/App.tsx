@@ -29,6 +29,11 @@ import { TrainingJobsPage } from '@/pages/TrainingJobsPage'
 import { TrainingJobDetailPage } from '@/pages/TrainingJobDetailPage'
 import { ModelArtifactsPage } from '@/pages/ModelArtifactsPage'
 import { ModelArtifactDetailPage } from '@/pages/ModelArtifactDetailPage'
+import { CapabilityCenterPage } from '@/pages/CapabilityCenterPage'
+import { ModelsPage } from '@/pages/ModelsPage'
+import { ModelDetailPage } from '@/pages/ModelDetailPage'
+import { AgentsPage } from '@/pages/AgentsPage'
+import { AgentDetailPage } from '@/pages/AgentDetailPage'
 import { usePlatformFocus } from '@/hooks/usePlatformFocus'
 import { useRangeTasks } from '@/hooks/useRangeTasks'
 import { useDataCenter } from '@/hooks/useDataCenter'
@@ -46,6 +51,8 @@ export default function App() {
   const [selectedBenchmarkDatasetId, setSelectedBenchmarkDatasetId] = useState('')
   const [selectedTrainingJobId, setSelectedTrainingJobId] = useState('')
   const [selectedArtifactId, setSelectedArtifactId] = useState('')
+  const [selectedModelId, setSelectedModelId] = useState('')
+  const [selectedAgentId, setSelectedAgentId] = useState('')
   const { setFocusedRun } = useRangeTasks()
   const { focusTask } = usePlatformFocus()
   const { results } = useDataCenter()
@@ -127,6 +134,16 @@ export default function App() {
     handleNavigate('artifact-detail')
   }
 
+  const openModel = (id: string) => {
+    setSelectedModelId(id)
+    handleNavigate('model-detail')
+  }
+
+  const openAgent = (id: string) => {
+    setSelectedAgentId(id)
+    handleNavigate('agent-detail')
+  }
+
   const openArtifactDataset = (type: 'cpt' | 'vulnerability', id: string) => {
     if (type === 'cpt') openCorpus(id)
     else openVulnerabilityDataset(id)
@@ -152,6 +169,7 @@ export default function App() {
           onOpenVulnerability={openVulnerabilityDataset}
           onOpenBenchmark={openBenchmarkDataset}
           onOpenArtifact={openArtifact}
+          onOpenCapabilityCenter={() => handleNavigate('capability-center')}
           onQuickStartTask={quickStartTask}
         />
       )
@@ -173,6 +191,8 @@ export default function App() {
             onNavigate={handleNavigate}
             onDirtyChange={setTasksDirty}
             onOpenRun={openRun}
+            onOpenModel={openModel}
+            onOpenAgent={openAgent}
             defaultCategory={quickTaskCategory}
             onConsumedDefaultCategory={() => setQuickTaskCategory(undefined)}
           />
@@ -201,18 +221,23 @@ export default function App() {
     }
 
     if (activeId === 'data-center') return <DataCenterPage onNavigate={handleNavigate} />
-    if (activeId === 'trajectories') return <TrajectoryDatasetsPage onOpenDataset={openDataset} />
+    if (activeId === 'trajectories') return <TrajectoryDatasetsPage onOpenDataset={openDataset} onNavigate={handleNavigate} />
     if (activeId === 'trajectory-detail') return <TrajectoryDatasetDetailPage datasetId={selectedDatasetId} onNavigate={handleNavigate} />
-    if (activeId === 'cpt') return <CptCorpusPage onOpenCorpus={openCorpus} onOpenTrainingJob={openTrainingJob} />
+    if (activeId === 'cpt') return <CptCorpusPage onOpenCorpus={openCorpus} onOpenTrainingJob={openTrainingJob} onNavigate={handleNavigate} />
     if (activeId === 'cpt-detail') return <CptCorpusDetailPage id={selectedCorpusId} onNavigate={handleNavigate} />
-    if (activeId === 'vulnerabilities') return <VulnerabilityDataPage onOpenVulnerability={openVulnerabilityDataset} onOpenTrainingJob={openTrainingJob} />
+    if (activeId === 'vulnerabilities') return <VulnerabilityDataPage onOpenVulnerability={openVulnerabilityDataset} onOpenTrainingJob={openTrainingJob} onNavigate={handleNavigate} />
     if (activeId === 'vulnerability-detail') return <VulnerabilityDetailPage uuid={selectedVulnerabilityDatasetId} onNavigate={handleNavigate} />
-    if (activeId === 'benchmarks') return <BenchmarkDatasetsPage onOpenBenchmark={openBenchmarkDataset} />
+    if (activeId === 'benchmarks') return <BenchmarkDatasetsPage onOpenBenchmark={openBenchmarkDataset} onNavigate={handleNavigate} />
     if (activeId === 'benchmark-detail') return <BenchmarkDatasetDetailPage datasetId={selectedBenchmarkDatasetId} onNavigate={handleNavigate} />
+    if (activeId === 'capability-center') return <CapabilityCenterPage onNavigate={handleNavigate} onOpenModel={openModel} onOpenAgent={openAgent} />
+    if (activeId === 'models') return <ModelsPage onOpenModel={openModel} onNavigate={handleNavigate} />
+    if (activeId === 'model-detail') return <ModelDetailPage modelId={selectedModelId} onNavigate={handleNavigate} onOpenAgent={openAgent} onOpenArtifact={openArtifact} onOpenTrainingJob={openTrainingJob} />
+    if (activeId === 'agents') return <AgentsPage onOpenAgent={openAgent} onOpenModel={openModel} onNavigate={handleNavigate} />
+    if (activeId === 'agent-detail') return <AgentDetailPage agentId={selectedAgentId} onNavigate={handleNavigate} onOpenModel={openModel} />
     if (activeId === 'training') return <TrainingJobsPage onOpenJob={openTrainingJob} onOpenArtifacts={() => handleNavigate('training-artifacts')} />
     if (activeId === 'training-detail') return <TrainingJobDetailPage jobId={selectedTrainingJobId} onNavigate={handleNavigate} onOpenCpt={openCorpus} onOpenVulnerability={openVulnerabilityDataset} onOpenArtifact={openArtifact} />
     if (activeId === 'training-artifacts') return <ModelArtifactsPage onOpenArtifact={openArtifact} onOpenTraining={() => handleNavigate('training')} />
-    if (activeId === 'artifact-detail') return <ModelArtifactDetailPage artifactId={selectedArtifactId} onNavigate={handleNavigate} onOpenJob={openTrainingJob} onOpenDataset={openArtifactDataset} />
+    if (activeId === 'artifact-detail') return <ModelArtifactDetailPage artifactId={selectedArtifactId} onNavigate={handleNavigate} onOpenJob={openTrainingJob} onOpenDataset={openArtifactDataset} onOpenModel={openModel} />
 
     return <DataCenterPage onNavigate={handleNavigate} />
   }

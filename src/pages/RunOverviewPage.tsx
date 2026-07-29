@@ -34,6 +34,7 @@ interface RunOverviewPageProps {
   onOpenVulnerability: (id: string) => void
   onOpenBenchmark: (id: string) => void
   onOpenArtifact: (id: string) => void
+  onOpenCapabilityCenter: () => void
   onQuickStartTask: (category: TaskCategory) => void
 }
 
@@ -60,6 +61,7 @@ export function RunOverviewPage({
   onOpenVulnerability,
   onOpenBenchmark,
   onOpenArtifact,
+  onOpenCapabilityCenter,
   onQuickStartTask,
 }: RunOverviewPageProps) {
   const { runSummaries, advanceRunSummaries, setFocusedRun } = useRangeTasks()
@@ -205,7 +207,13 @@ export function RunOverviewPage({
         </div>
 
         <section className="space-y-3">
-          <h2 className="text-lg font-semibold">快速开始</h2>
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <h2 className="text-lg font-semibold">快速开始</h2>
+            <Button variant="secondary" onClick={onOpenCapabilityCenter}>
+              查看模型、守卫模型与攻防智能体能力资产
+              <ArrowRight className="h-4 w-4" />
+            </Button>
+          </div>
           <div className="grid gap-4 xl:grid-cols-3">
             <QuickStartCard
               icon={<ShieldCheck className="h-5 w-5" />}
@@ -319,15 +327,15 @@ export function RunOverviewPage({
           ) : null}
         </section>
 
-        <div className="grid gap-5 2xl:grid-cols-[1.2fr_0.8fr]">
+        <div className="grid items-stretch gap-5 2xl:grid-cols-[minmax(0,1.45fr)_minmax(360px,0.55fr)]">
           <RecentResults
-            results={results.slice(0, 5)}
+            results={results.slice(0, 3)}
             onNavigate={onNavigate}
             onOpenResult={onOpenResult}
             onOpenRun={onOpenRun}
             onOpenDataset={onOpenDataset}
           />
-          <RecentAssets assets={latestAssets} />
+          <RecentAssets assets={latestAssets} onViewAll={() => onNavigate('data-center')} />
         </div>
       </div>
     </main>
@@ -521,7 +529,7 @@ function RecentResults({
   onOpenDataset: (datasetId: string) => void
 }) {
   return (
-    <Card>
+    <Card className="h-full w-full min-w-0">
       <CardHeader>
         <div className="flex items-center justify-between gap-3">
           <CardTitle>最近评测结果</CardTitle>
@@ -569,13 +577,16 @@ function RecentResults({
   )
 }
 
-function RecentAssets({ assets }: { assets: AssetItem[] }) {
+function RecentAssets({ assets, onViewAll }: { assets: AssetItem[]; onViewAll: () => void }) {
   return (
-    <Card>
+    <Card className="h-full w-full min-w-0">
       <CardHeader>
-        <CardTitle>最近数据与模型产物</CardTitle>
+        <div className="flex items-center justify-between gap-3">
+          <CardTitle>最近数据与模型产物</CardTitle>
+          <Button size="sm" variant="secondary" onClick={onViewAll}>查看全部</Button>
+        </div>
       </CardHeader>
-      <CardContent className="grid gap-3 md:grid-cols-2 2xl:grid-cols-1">
+      <CardContent className="grid gap-3">
         {assets.map((asset) => (
           <button
             key={`${asset.type}-${asset.id}`}
@@ -802,7 +813,7 @@ function buildLatestAssets({
     })),
   ]
     .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
-    .slice(0, 6)
+    .slice(0, 3)
 }
 
 function statusText(status: PlatformTaskSummary['status']) {

@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { Brain, Boxes, ListChecks } from 'lucide-react'
+import { Brain, Boxes, Database, Eye, ListChecks, PackageOpen, Square } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
@@ -58,10 +58,10 @@ export function TrainingJobsPage({ onOpenJob, onOpenArtifacts }: TrainingJobsPag
 
         <Card>
           <CardContent className="overflow-x-auto p-0">
-            <table className="w-full min-w-[1280px] text-left text-sm">
+            <table className="w-full min-w-[1180px] text-left text-sm">
               <thead className="bg-[var(--color-surface-muted)] text-xs text-[var(--color-ink-muted)]">
                 <tr>
-                  {['Training ID', '任务名称', '基础模型', '训练方式', 'CPT 数据集', '漏洞数据集', 'Benchmark', '状态', '当前进度', '当前阶段', '已运行时间', '预计剩余时间', '创建时间', '操作'].map((item) => <th key={item} className="px-3 py-2">{item}</th>)}
+                  {['Training ID', '任务名称', '基础模型', '训练方式', 'CPT 数据集', '漏洞数据集', '状态', '当前进度', '当前阶段', '已运行时间', '预计剩余时间', '创建时间', '操作'].map((item) => <th key={item} className="px-3 py-2">{item}</th>)}
                 </tr>
               </thead>
               <tbody>
@@ -97,7 +97,6 @@ function JobRow({ job, onOpenJob, onStop }: { job: TrainingJob; onOpenJob: (jobI
       <td className="px-3 py-3">{methodText(job.trainingMethod)}</td>
       <td className="px-3 py-3">{cptCount} 个</td>
       <td className="px-3 py-3">{vulnCount} 个</td>
-      <td className="px-3 py-3">{job.benchmarkDatasetIds.length} 个</td>
       <td className="px-3 py-3"><StatusBadge status={job.status} /></td>
       <td className="px-3 py-3">{job.progress}%</td>
       <td className="px-3 py-3">{stageText(job.stage)}</td>
@@ -105,11 +104,27 @@ function JobRow({ job, onOpenJob, onStop }: { job: TrainingJob; onOpenJob: (jobI
       <td className="px-3 py-3">{job.eta}</td>
       <td className="px-3 py-3">{job.createdAt}</td>
       <td className="px-3 py-3">
-        <div className="flex flex-wrap gap-1">
-          <Button size="sm" variant="secondary" onClick={() => onOpenJob(job.id)}>查看训练</Button>
-          <Button size="sm" variant="ghost" onClick={() => onOpenJob(job.id)}>查看数据</Button>
-          {!['completed', 'failed', 'stopped'].includes(job.status) ? <Button size="sm" variant="ghost" onClick={onStop}>停止任务</Button> : null}
-          {job.artifactId ? <Button size="sm" variant="ghost" onClick={() => onOpenJob(job.id)}>查看产物</Button> : null}
+        <div className="flex items-center gap-1.5 whitespace-nowrap">
+          <Button size="sm" variant="secondary" onClick={() => onOpenJob(job.id)}>
+            <Eye className="h-3.5 w-3.5" />
+            详情
+          </Button>
+          <Button size="sm" variant="ghost" onClick={() => onOpenJob(job.id)}>
+            <Database className="h-3.5 w-3.5" />
+            数据
+          </Button>
+          {!['completed', 'failed', 'stopped'].includes(job.status) ? (
+            <Button size="sm" variant="ghost" onClick={onStop}>
+              <Square className="h-3.5 w-3.5" />
+              停止
+            </Button>
+          ) : null}
+          {job.artifactId ? (
+            <Button size="sm" variant="ghost" onClick={() => onOpenJob(job.id)}>
+              <PackageOpen className="h-3.5 w-3.5" />
+              产物
+            </Button>
+          ) : null}
         </div>
       </td>
     </tr>

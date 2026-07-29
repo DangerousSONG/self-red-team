@@ -1,4 +1,4 @@
-import { Boxes, Brain, ListChecks } from 'lucide-react'
+import { ArrowLeft, Boxes, Brain, ListChecks } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { useDataCenter } from '@/hooks/useDataCenter'
@@ -23,9 +23,15 @@ export function ModelArtifactsPage({ onOpenArtifact, onOpenTraining }: ModelArti
             <h1 className="mt-2 text-2xl font-semibold">模型产物</h1>
             <p className="mt-1 text-sm text-[var(--color-ink-secondary)]">查看训练完成后的基模产物、评测分数和文件清单</p>
           </div>
-          <div className="flex rounded-lg border border-[var(--color-border)] bg-white p-1">
-            <Button size="sm" variant="ghost" onClick={onOpenTraining}><ListChecks className="h-4 w-4" />训练任务</Button>
-            <Button size="sm" variant="default"><Boxes className="h-4 w-4" />模型产物</Button>
+          <div className="flex flex-wrap items-center gap-2">
+            <Button variant="secondary" onClick={onOpenTraining}>
+              <ArrowLeft className="h-4 w-4" />
+              返回基模训练
+            </Button>
+            <div className="flex rounded-lg border border-[var(--color-border)] bg-white p-1">
+              <Button size="sm" variant="ghost" onClick={onOpenTraining}><ListChecks className="h-4 w-4" />训练任务</Button>
+              <Button size="sm" variant="default"><Boxes className="h-4 w-4" />模型产物</Button>
+            </div>
           </div>
         </div>
 

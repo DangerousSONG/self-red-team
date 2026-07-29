@@ -4,20 +4,25 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { useDataCenter } from '@/hooks/useDataCenter'
+import { useCapabilityAssets } from '@/hooks/useCapabilityAssets'
+import { statusText } from '@/pages/CapabilityCenterPage'
 
 interface ModelArtifactDetailPageProps {
   artifactId: string
   onNavigate: (id: string) => void
   onOpenJob: (jobId: string) => void
   onOpenDataset: (type: 'cpt' | 'vulnerability', id: string) => void
+  onOpenModel?: (modelId: string) => void
 }
 
 const tabs = ['模型介绍', '训练信息', '评测结果', '产物文件', '使用说明']
 
-export function ModelArtifactDetailPage({ artifactId, onNavigate, onOpenJob, onOpenDataset }: ModelArtifactDetailPageProps) {
+export function ModelArtifactDetailPage({ artifactId, onNavigate, onOpenJob, onOpenDataset, onOpenModel }: ModelArtifactDetailPageProps) {
   const { modelArtifacts, trainingJobs } = useDataCenter()
+  const { modelAssets } = useCapabilityAssets()
   const artifact = modelArtifacts.find((item) => item.id === artifactId) ?? modelArtifacts[0]
   const job = trainingJobs.find((item) => item.id === artifact.trainingJobId)
+  const linkedModel = modelAssets.find((item) => item.artifactId === artifact.id)
   const [activeTab, setActiveTab] = useState(tabs[0])
 
   return (
@@ -74,6 +79,11 @@ export function ModelArtifactDetailPage({ artifactId, onNavigate, onOpenJob, onO
               <Mini label="总 Token" value={job?.datasets.reduce((sum, item) => sum + (item.tokenCount ?? 0), 0).toLocaleString() ?? '-'} />
               <Mini label="总训练时间" value={job?.elapsed ?? '-'} />
               <Mini label="训练成本" value="Mock 12,800 元" />
+              {linkedModel ? (
+                <Mini label="关联模型资产" value={`${linkedModel.name} / ${statusText(linkedModel.status)}`} action={onOpenModel ? () => onOpenModel(linkedModel.id) : undefined} />
+              ) : (
+                <Mini label="关联模型资产" value="当前产物尚未关联模型资产" />
+              )}
               {job?.datasets.map((dataset) => (
                 <Mini key={dataset.datasetId} label={dataset.datasetType === 'cpt' ? 'CPT 数据集' : '漏洞数据集'} value={dataset.datasetName} action={() => onOpenDataset(dataset.datasetType, dataset.datasetId)} />
               ))}
