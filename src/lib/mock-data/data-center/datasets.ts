@@ -212,6 +212,9 @@ export const initialCptDatasets: CptCorpusDataset[] = [
   tokenTotal: tokenTotal as number,
   reviewProgress: reviewProgress as number,
   desensitizationStatus: desensitizationStatus as string,
+  trainingRefCount: id === 'cpt-vuln-root-001' ? 3 : id === 'cpt-exploit-analysis-001' ? 2 : 1,
+  lastTrainingAt: '2026-07-29 14:20',
+  latestArtifact: id === 'cpt-vuln-root-001' ? 'Shusheng-35B-Cyber-CPT-v1' : 'InternLM-7B-Security-CPT-v1',
 }))
 
 export const initialVulnerabilityDatasets: VulnerabilityDataset[] = [
@@ -261,4 +264,7 @@ export const initialVulnerabilityDatasets: VulnerabilityDataset[] = [
   severityDistribution: { Low: 8, Medium: 18, High: 14, Critical: 4 },
   cweCount: cweCount as number,
   sandboxCount: sandboxCount as number,
+  trainingRefCount: id === 'vds-master-001' ? 4 : id === 'vds-cybergym-001' ? 2 : 1,
+  lastTrainingAt: '2026-07-29 14:20',
+  latestArtifact: id === 'vds-master-001' ? 'Shusheng-35B-Cyber-CPT-v1' : 'InternLM-35B-Vuln-CPT-v1',
 }))

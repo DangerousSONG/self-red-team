@@ -1,29 +1,30 @@
 # AI 安全面场 / Cyber Range Console
 
-面向 AI Agent 安全评测的本地 Mock 控制台，用于演示从评测任务创建、RangeRun 运行、结果报告到数据资产沉淀的完整闭环。
+面向 AI Agent 安全评测的本地 Mock 控制台，用于演示从评测任务创建、RangeRun 运行、结果报告、数据资产沉淀到基模训练产物管理的完整闭环。
 
 ## 本阶段新增
 
-- 评测结果页拆分为“基准评测”和“场景演练”两个 Tab，统计卡、筛选项和表格字段会随当前分类变化。
-- 基准评测结果覆盖 CyberGym、ExploitGym、PatchEval，并按漏洞挖掘、漏洞利用、漏洞修复展示差异化指标。
-- 数据中心首页保留三类资产入口：轨迹数据集、CPT 语料库、漏洞数据，每张入口卡展示数据集数量、记录总量、本周新增和最近更新时间。
-- 三类数据资产页均默认使用数据集卡片视图，并支持搜索、筛选、排序、卡片 / 列表视图切换、空状态、加载骨架和 Mock Toast。
-- CPT 语料库已改为“语料数据集 → 语料条目”的结构；漏洞数据已改为“漏洞数据集 → VulnerabilityRecord”的结构。
-- 数据集详情页统一为 Dataset Hub 形态：顶部 Header、页签导航、主内容区和右侧发布信息栏。
-- 结果页的数据沉淀状态可直接跳转到目标轨迹数据集；处理完成后展示“查看数据集”和“返回评测结果”入口。
+- 数据中心从三类资产扩展为四类：轨迹数据集、CPT 语料库、漏洞数据、Benchmark 数据集。
+- 新增 Benchmark 数据集列表和详情门户，覆盖 CyberGym、ExploitGym、PatchEval 和自研综合评测集。
+- CPT 语料库和漏洞数据支持“训练选择模式”，可勾选数据集并发起基模训练。
+- 新增“基模训练”导航入口，包含训练任务列表和模型产物页。
+- 新增训练任务详情页，展示训练阶段、训练指标、数据使用、Benchmark 对比、Checkpoint、运行日志和模型产物。
+- 训练完成后生成 Mock ModelArtifact，并提供模型产物详情页。
+- 全部训练、指标、Checkpoint、Benchmark 对比和模型产物继续使用前端 Mock 状态与 localStorage 持久化。
 
-## 完整操作路径
+## 完整用户路径
 
-1. 进入“评测任务”。
-2. 在“场景演练”或“基准评测”中选择任务。
-3. 完成资源匹配、运行配置和 CasePlan 确认。
-4. 启动 RangeRun，进入运行控制台。
-5. 点击“完成演练”进入 Completed 状态。
-6. 点击“查看评测报告”进入结果详情页。
-7. 在报告页或结果列表中点击“处理数据”。
-8. 选择需要沉淀的数据产物。
-9. 选择创建新轨迹数据集、加入已有轨迹数据集或暂不沉淀。
-10. 确认处理后，可跳转到数据中心对应轨迹数据集详情页。
+1. 进入“数据中心”。
+2. 查看四类数据资产入口。
+3. 进入“CPT 语料库”或“漏洞数据”。
+4. 开启“训练选择模式”。
+5. 勾选一个或多个数据集。
+6. 点击“用于基模训练”。
+7. 在“创建基模训练任务”Dialog 中填写任务名称、基础模型、训练方式、评测 Benchmark 和备注。
+8. 创建后跳转训练任务详情页。
+9. 在详情页查看阶段、指标、数据使用、Benchmark 对比、Checkpoint 和日志。
+10. 训练完成后查看模型产物。
+11. 从模型产物详情回溯来源 TrainingJob 和来源数据集。
 
 ## 页面与路由
 
@@ -39,83 +40,165 @@
 - `/data-center/cpt/:datasetId`
 - `/data-center/vulnerabilities`
 - `/data-center/vulnerabilities/:datasetId`
+- `/data-center/benchmarks`
+- `/data-center/benchmarks/:datasetId`
+- `/training`
+- `/training/:jobId`
+- `/training/artifacts`
+- `/training/artifacts/:artifactId`
 
-## 评测结果分类
+## 数据中心四类资产
 
-“基准评测”用于标准化评测漏洞挖掘、漏洞利用和漏洞修复 Agent，当前包含：
+- 轨迹数据集：来源于场景演练、基准评测和 Agent 执行过程，后续用于 Agent SFT / RL / 策略优化。本阶段不接入基模训练。
+- CPT 语料库：用于安全领域持续预训练，可勾选数据集发起基模训练。
+- 漏洞数据：用于增强模型对漏洞描述、漏洞关系、CVE/CWE 和安全知识的理解，可勾选数据集发起基模训练。
+- Benchmark 数据集：用于训练前后能力评测，包含 CyberGym、ExploitGym、PatchEval 和自研综合评测集，本阶段默认不作为训练数据。
 
-- CyberGym：白盒漏洞挖掘 Agent 评测
-- ExploitGym：灰盒 / 白盒辅助漏洞利用 Agent 评测
-- PatchEval：白盒漏洞修复 Agent 评测
+## Benchmark 数据集
 
-“场景演练”用于多节点网络环境中的黑盒、灰盒和长程攻防能力评测，当前可运行任务为“企业内网横向移动”，目标是从 edge01 进入 app01，最终访问 vault01。
-
-## 数据集体系
-
-数据中心分为三类数据资产：
-
-- 轨迹数据集：保存 Agent 行为轨迹、工具调用轨迹、攻击路径、评分引用和数据沉淀标签。
-- CPT 语料库：以语料数据集为单位管理漏洞知识、攻击方法、修复经验、安全报告和演练过程摘要等领域文本。
-- 漏洞数据：以漏洞数据集为单位管理来自 NVD、OSV、GitHub Advisory、CyberGym、ExploitGym 和 RangeRun 的漏洞记录。
-
-数据集详情页统一包含：
+Benchmark 数据集详情页沿用 Dataset Hub 结构：
 
 - 数据集介绍
 - 数据集详情
-- 数据记录
+- 评测任务
 - 数据文件
 - 使用说明
-- 右侧发布信息栏
 
-轨迹记录只展示结构化任务规划、已执行步骤、可观测 Agent 行为、工具调用与结果，不展示或伪造模型隐藏思维链。
+评测任务字段包括 Task ID、项目、漏洞类型、CVE / CWE、任务类型、难度、输入类型、输出要求、验证方式和状态。
 
-## DatasetMetadata
+## 基模训练
 
-统一数据集元数据类型定义在 `src/types/dataset.ts`：
+创建训练任务时只暴露必要产品字段：
+
+- 训练任务名称
+- 基础模型：Shusheng-35B、InternLM-35B、InternLM-7B
+- 训练方式：CPT 持续预训练、CPT + 漏洞知识增强
+- 评测 Benchmark：CyberGym、ExploitGym、PatchEval、自研综合评测集
+- 任务备注
+
+不会展示学习率、batch size、optimizer、epoch、GPU 拓扑或分布式参数。本阶段不做真实 GPU 调度、不做真实模型训练、不做 RL 训练、不做 Agent 训练、不做模型部署。
+
+训练状态覆盖：
+
+- Draft
+- Queued
+- Preparing
+- Running
+- Evaluating
+- Completed
+- Failed
+- Stopped
+
+训练阶段覆盖：
+
+- 数据校验
+- 数据预处理
+- 数据加载
+- Rollout
+- 模型训练
+- Checkpoint 保存
+- 基准评测
+- 产物生成
+
+## 训练指标
+
+训练详情页将指标分为四组：
+
+- 训练效果：`rollout/raw_reward`、`rollout/truncated_ratio`、`rollout/response_len/min`、`rollout/response_len/max`、`rollout/response_len/mean`，x-axis 使用 `rollout_step`。
+- 数据质量：`fetched/reward`、`used/reward`，x-axis 使用 `rollout_step`，用于观察数据筛选是否带来质量增益。
+- 训练稳定性：`train/ppo_kl`、`train/pg_clipfrac`、`train/entropy_loss`，x-axis 使用 `train_step`。
+- 训练效率：`perf/wait_time_ratio`、`perf/train_wait_time`、`perf/train_time`、`perf/step_time`，x-axis 使用 `rollout_step`。
+
+页面支持最近 100 steps、最近 500 steps 和全部范围切换。Running 任务会通过 Mock 定时器追加指标点，刷新后从 localStorage 恢复。
+
+## Benchmark 前后评测
+
+训练任务可关联 Benchmark 数据集，并展示：
+
+- 训练前基线
+- 训练中 Checkpoint
+- 训练后模型
+
+CyberGym 展示漏洞定位正确率、漏洞验证成功率、PoC 有效性和综合评分。  
+ExploitGym 展示 Exploit 成功率、Payload 有效性、目标达成率和综合评分。  
+PatchEval 展示漏洞修复率、功能测试通过率、安全测试通过率、回归测试通过率和综合评分。
+
+Mock 分数保持温和提升，例如训练前 61、Checkpoint 72、训练后 78。
+
+## 模型产物
+
+模型产物卡片展示：
+
+- 模型名称
+- Artifact ID
+- 来源训练任务
+- 基础模型
+- 训练方式
+- 数据版本
+- 模型版本
+- 模型大小
+- Benchmark 综合分
+- 创建时间
+- 状态
+- 标签
+
+模型产物详情页包含：
+
+- 模型介绍
+- 训练信息
+- 评测结果
+- 产物文件
+- 使用说明
+
+产物文件为 Mock 展示，包括 `config.json`、tokenizer files、model shards、`training_manifest.json` 和 `evaluation_report.json`。
+
+## 类型结构
+
+数据集元数据定义在 `src/types/dataset.ts`，`DatasetMetadata.type` 当前支持：
 
 ```ts
-type DatasetMetadata = {
+'trajectory' | 'cpt' | 'vulnerability' | 'benchmark'
+```
+
+训练类型定义在 `src/types/training.ts`：
+
+```ts
+type TrainingJob = {
   id: string
   name: string
-  description: string
-  type: 'trajectory' | 'cpt' | 'vulnerability'
-  visibility: 'public' | 'internal' | 'private'
-  status: 'draft' | 'published' | 'updating' | 'archived'
-  owner: string
-  organization: string
-  version: string
-  tags: string[]
-  license: DatasetLicense
-  createdAt: string
-  updatedAt: string
-  files: DatasetFile[]
-  sourceTypes: string[]
+  baseModel: string
+  trainingMethod: 'cpt' | 'cpt_vulnerability_enhancement'
+  datasets: TrainingDatasetReference[]
+  benchmarkDatasetIds: string[]
+  status: TrainingStatus
+  stage: TrainingStage
+  progress: number
+  metrics: TrainingMetricSeries[]
+  checkpointIds: string[]
+  artifactId?: string
 }
 ```
 
-轨迹、CPT 和漏洞数据集会在此基础上扩展各自统计字段、介绍、详情、使用说明和记录列表。
-
-## VulnerabilityRecord
-
-漏洞数据类型定义在 `src/types/vulnerability.ts`：
+模型产物类型定义在 `src/types/model-artifact.ts`：
 
 ```ts
-type VulnerabilityRecord = {
-  uuid: string
-  description: string
-  datePublished: string | null
-  dateUpdated: string | null
-  relations: VulnerabilityRelation[]
-  extra: VulnerabilityExtra
+type ModelArtifact = {
+  id: string
+  name: string
+  version: string
+  baseModel: string
+  trainingJobId: string
+  trainingMethod: string
+  datasetIds: string[]
+  benchmarkScores: Record<string, number>
+  modelSize: string
+  status: 'generating' | 'ready' | 'failed' | 'archived'
+  createdAt: string
+  tags: string[]
 }
 ```
 
-uuid 使用来源、原始 ID 和 Mock description hash 组成，示例：
-
-- `CVE:CVE-2024-1001:a8f9c0`
-- `OSV:GHSA-229r-pqp6-8w6g:a8f9c2`
-
-`relations` 描述 alias、upstream、related 关系；`extra.sources` 保存来源名称、原始 ID 和来源特有结构化数据。漏洞详情页会展示基本信息、relations、extra.sources、关联资产和只读原始 JSON。
+漏洞记录仍遵循 `src/types/vulnerability.ts` 中的 `VulnerabilityRecord`，不破坏原有结构。
 
 ## Mock 数据
 
@@ -126,17 +209,21 @@ Mock 数据放在：
 - `src/lib/mock-data/data-center/cpt-corpus.ts`
 - `src/lib/mock-data/data-center/vulnerabilities.ts`
 - `src/lib/mock-data/data-center/datasets.ts`
+- `src/lib/mock-data/data-center/benchmark-datasets.ts`
+- `src/lib/mock-data/data-center/training.ts`
 
 当前至少包含：
 
 - 6 个轨迹数据集
 - 5 个 CPT 语料数据集
 - 7 个漏洞数据集
+- 4 个 Benchmark 数据集
+- 6 个训练任务
+- 10 个以上 Checkpoint
+- 4 个模型产物
 - 12 条以上轨迹记录
 - 10 条以上 CPT 语料条目
 - 15 条以上漏洞记录
-
-本阶段不接真实后端、不做真实模型训练、不做真实 RL 训练、不提供真实上传下载服务。
 
 ## 启动与验证
 

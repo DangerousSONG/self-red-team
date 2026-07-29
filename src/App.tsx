@@ -23,6 +23,12 @@ import { CptCorpusPage } from '@/pages/CptCorpusPage'
 import { CptCorpusDetailPage } from '@/pages/CptCorpusDetailPage'
 import { VulnerabilityDataPage } from '@/pages/VulnerabilityDataPage'
 import { VulnerabilityDetailPage } from '@/pages/VulnerabilityDetailPage'
+import { BenchmarkDatasetsPage } from '@/pages/BenchmarkDatasetsPage'
+import { BenchmarkDatasetDetailPage } from '@/pages/BenchmarkDatasetDetailPage'
+import { TrainingJobsPage } from '@/pages/TrainingJobsPage'
+import { TrainingJobDetailPage } from '@/pages/TrainingJobDetailPage'
+import { ModelArtifactsPage } from '@/pages/ModelArtifactsPage'
+import { ModelArtifactDetailPage } from '@/pages/ModelArtifactDetailPage'
 
 export default function App() {
   const [activeId, setActiveId] = useState('home')
@@ -32,6 +38,9 @@ export default function App() {
   const [selectedDatasetId, setSelectedDatasetId] = useState('')
   const [selectedCorpusId, setSelectedCorpusId] = useState('')
   const [selectedVulnerabilityDatasetId, setSelectedVulnerabilityDatasetId] = useState('')
+  const [selectedBenchmarkDatasetId, setSelectedBenchmarkDatasetId] = useState('')
+  const [selectedTrainingJobId, setSelectedTrainingJobId] = useState('')
+  const [selectedArtifactId, setSelectedArtifactId] = useState('')
 
   const handleNavigate = (id: string) => {
     if (activeId === 'tasks' && id !== 'tasks' && tasksDirty) {
@@ -64,6 +73,26 @@ export default function App() {
   const openVulnerabilityDataset = (id: string) => {
     setSelectedVulnerabilityDatasetId(id)
     handleNavigate('vulnerability-detail')
+  }
+
+  const openBenchmarkDataset = (id: string) => {
+    setSelectedBenchmarkDatasetId(id)
+    handleNavigate('benchmark-detail')
+  }
+
+  const openTrainingJob = (id: string) => {
+    setSelectedTrainingJobId(id)
+    handleNavigate('training-detail')
+  }
+
+  const openArtifact = (id: string) => {
+    setSelectedArtifactId(id)
+    handleNavigate('artifact-detail')
+  }
+
+  const openArtifactDataset = (type: 'cpt' | 'vulnerability', id: string) => {
+    if (type === 'cpt') openCorpus(id)
+    else openVulnerabilityDataset(id)
   }
 
   const leaveTasks = (saveDraft: boolean) => {
@@ -115,10 +144,16 @@ export default function App() {
     if (activeId === 'data-center') return <DataCenterPage onNavigate={handleNavigate} />
     if (activeId === 'trajectories') return <TrajectoryDatasetsPage onOpenDataset={openDataset} />
     if (activeId === 'trajectory-detail') return <TrajectoryDatasetDetailPage datasetId={selectedDatasetId} onNavigate={handleNavigate} />
-    if (activeId === 'cpt') return <CptCorpusPage onOpenCorpus={openCorpus} />
+    if (activeId === 'cpt') return <CptCorpusPage onOpenCorpus={openCorpus} onOpenTrainingJob={openTrainingJob} />
     if (activeId === 'cpt-detail') return <CptCorpusDetailPage id={selectedCorpusId} onNavigate={handleNavigate} />
-    if (activeId === 'vulnerabilities') return <VulnerabilityDataPage onOpenVulnerability={openVulnerabilityDataset} />
+    if (activeId === 'vulnerabilities') return <VulnerabilityDataPage onOpenVulnerability={openVulnerabilityDataset} onOpenTrainingJob={openTrainingJob} />
     if (activeId === 'vulnerability-detail') return <VulnerabilityDetailPage uuid={selectedVulnerabilityDatasetId} onNavigate={handleNavigate} />
+    if (activeId === 'benchmarks') return <BenchmarkDatasetsPage onOpenBenchmark={openBenchmarkDataset} />
+    if (activeId === 'benchmark-detail') return <BenchmarkDatasetDetailPage datasetId={selectedBenchmarkDatasetId} onNavigate={handleNavigate} />
+    if (activeId === 'training') return <TrainingJobsPage onOpenJob={openTrainingJob} onOpenArtifacts={() => handleNavigate('training-artifacts')} />
+    if (activeId === 'training-detail') return <TrainingJobDetailPage jobId={selectedTrainingJobId} onNavigate={handleNavigate} onOpenCpt={openCorpus} onOpenVulnerability={openVulnerabilityDataset} onOpenArtifact={openArtifact} />
+    if (activeId === 'training-artifacts') return <ModelArtifactsPage onOpenArtifact={openArtifact} onOpenTraining={() => handleNavigate('training')} />
+    if (activeId === 'artifact-detail') return <ModelArtifactDetailPage artifactId={selectedArtifactId} onNavigate={handleNavigate} onOpenJob={openTrainingJob} onOpenDataset={openArtifactDataset} />
 
     return <DataCenterPage onNavigate={handleNavigate} />
   }

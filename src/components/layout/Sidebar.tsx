@@ -1,4 +1,4 @@
-import { BarChart3, Database, FileText, LayoutDashboard, Network, PlayCircle, type LucideIcon } from 'lucide-react'
+import { BarChart3, Brain, Database, FileText, LayoutDashboard, Network, PlayCircle, type LucideIcon } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useRangeTasks } from '@/hooks/useRangeTasks'
 
@@ -8,6 +8,7 @@ const stageNavItems = [
   { id: 'rangerun', label: 'RangeRun', icon: 'PlayCircle' },
   { id: 'results', label: '评分结果', icon: 'BarChart3' },
   { id: 'data-center', label: '数据中心', icon: 'Database' },
+  { id: 'training', label: '基模训练', icon: 'Brain' },
 ] as const
 
 const iconMap: Record<string, LucideIcon> = {
@@ -16,6 +17,7 @@ const iconMap: Record<string, LucideIcon> = {
   PlayCircle,
   BarChart3,
   Database,
+  Brain,
 }
 
 interface SidebarProps {
@@ -28,8 +30,10 @@ export function Sidebar({ activeId, onNavigate }: SidebarProps) {
 
   const activeGroup = activeId.startsWith('result') || activeId === 'run-data'
     ? 'results'
-    : activeId.startsWith('trajectory') || activeId.startsWith('cpt') || activeId.startsWith('vulnerability')
+    : activeId.startsWith('trajectory') || activeId.startsWith('cpt') || activeId.startsWith('vulnerability') || activeId.startsWith('benchmark')
       ? 'data-center'
+      : activeId.startsWith('training') || activeId.startsWith('artifact')
+        ? 'training'
       : activeId
 
   return (

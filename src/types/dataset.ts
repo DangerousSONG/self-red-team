@@ -25,7 +25,7 @@ export type DatasetMetadata = {
   id: string
   name: string
   description: string
-  type: 'trajectory' | 'cpt' | 'vulnerability'
+  type: 'trajectory' | 'cpt' | 'vulnerability' | 'benchmark'
   visibility: DatasetVisibility
   status: DatasetStatus
   owner: string
@@ -102,6 +102,9 @@ export type CptCorpusDataset = DatasetMetadata & {
   tokenTotal: number
   reviewProgress: number
   desensitizationStatus: string
+  trainingRefCount?: number
+  lastTrainingAt?: string
+  latestArtifact?: string
 }
 
 export type VulnerabilityDataset = DatasetMetadata & {
@@ -113,9 +116,41 @@ export type VulnerabilityDataset = DatasetMetadata & {
   severityDistribution: Record<string, number>
   cweCount: number
   sandboxCount: number
+  trainingRefCount?: number
+  lastTrainingAt?: string
+  latestArtifact?: string
 }
 
-export type DatasetAsset = TrajectoryDatasetCard | CptCorpusDataset | VulnerabilityDataset
+export type BenchmarkDataset = DatasetMetadata & {
+  type: 'benchmark'
+  benchmarkType: 'CyberGym' | 'ExploitGym' | 'PatchEval' | 'Internal'
+  evaluationTarget: string
+  taskForm: string
+  outputs: string[]
+  taskCount: number
+  projectCount: number
+  languages: string[]
+  difficultyDistribution: Record<string, number>
+  baselineSuccessRate: number
+  split: string
+  evaluationMetrics: string[]
+}
+
+export type BenchmarkTaskRecord = {
+  id: string
+  datasetId: string
+  project: string
+  vulnerabilityType: string
+  cveOrCwe: string
+  taskType: string
+  difficulty: string
+  inputType: string
+  outputRequirement: string
+  verificationMethod: string
+  status: 'ready' | 'reviewing' | 'deprecated'
+}
+
+export type DatasetAsset = TrajectoryDatasetCard | CptCorpusDataset | VulnerabilityDataset | BenchmarkDataset
 
 export type DatasetRecords = {
   trajectory: {
@@ -129,5 +164,9 @@ export type DatasetRecords = {
   vulnerability: {
     dataset: VulnerabilityDataset
     vulnerabilities: VulnerabilityRecord[]
+  }
+  benchmark: {
+    dataset: BenchmarkDataset
+    tasks: BenchmarkTaskRecord[]
   }
 }
