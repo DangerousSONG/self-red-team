@@ -8,6 +8,7 @@ import {
   type ReactNode,
 } from 'react'
 import { initialTasks } from '@/lib/mock-data/tasks'
+import { initialRangeRunSummaries } from '@/lib/mock-data/range-runs'
 import { agentProfiles, modelProfiles, rangeEnvironments } from '@/lib/mock-data/resources'
 import type {
   AgentProfile,
@@ -16,6 +17,7 @@ import type {
   ModelProfile,
   RangeEnvironment,
   RangeRun,
+  RangeRunSummary,
   RunConfig,
   Task,
   TaskStatus,
@@ -27,6 +29,8 @@ const CURRENT_TASK_KEY = 'self-red-team.current-task'
 const CURRENT_CASE_PLAN_KEY = 'self-red-team.current-case-plan'
 const CURRENT_RUN_KEY = 'self-red-team.current-run'
 const DRAFT_PROGRESS_KEY = 'self-red-team.draft-progress'
+const RUN_SUMMARIES_KEY = 'self-red-team.run-summaries.v2'
+const FOCUSED_RUN_KEY = 'self-red-team.focused-run-id.v2'
 
 export const defaultRunConfig: RunConfig = {
   runName: '横向移动攻防演练',
@@ -56,6 +60,8 @@ interface RangeTaskContextValue {
   currentTask: Task | null
   currentCasePlan: CasePlan | null
   currentRun: RangeRun | null
+  runSummaries: RangeRunSummary[]
+  focusedRunId: string | null
   draftProgress: DraftProgress
   setDraftProgress: (progress: DraftProgress) => void
   createTask: (input: TaskBuildInput, status?: TaskStatus) => { task: Task; casePlan: CasePlan }
@@ -65,6 +71,9 @@ interface RangeTaskContextValue {
   stopRun: () => RangeRun | null
   completeRun: () => RangeRun | null
   duplicateTask: (taskId: string) => Task | null
+  setFocusedRun: (runId: string) => RangeRunSummary | null
+  advanceRunSummaries: () => void
+  stopRunSummary: (runId: string) => void
 }
 
 const RangeTaskContext = createContext<RangeTaskContextValue | null>(null)
@@ -199,6 +208,68 @@ function buildRun(task: Task, casePlan: CasePlan): RangeRun {
   }
 }
 
+function buildRunFromSummary(summary: RangeRunSummary): RangeRun {
+  return {
+    id: summary.id,
+    taskId: `task-${summary.id}`,
+    casePlanId: `CP-${summary.id}`,
+    taskName: summary.taskName,
+    environment: summary.environment,
+    agent: summary.agent,
+    model: summary.model,
+    status: summary.status === 'completed' ? 'Completed' : summary.status === 'failed' || summary.status === 'stopped' ? 'Stopped' : 'Running',
+    startedAt: summary.updatedAt,
+  }
+}
+
+function taskFromSummary(summary: RangeRunSummary): Task {
+  return {
+    id: `task-${summary.id}`,
+    templateId: summary.benchmark ? summary.benchmark : 'enterprise-lateral',
+    name: summary.taskName,
+    type: summary.category === 'benchmark' ? '基准评测' : '场景演练',
+    environment: summary.environment,
+    agent: summary.agent,
+    model: summary.model,
+    status: summary.status === 'completed' ? 'completed' : ['failed', 'stopped'].includes(summary.status) ? 'configured' : 'running',
+    createdAt: summary.updatedAt,
+    objective: summary.stageDescription ?? summary.currentStage,
+    benchmark: summary.benchmark,
+  }
+}
+
+function nextStatus(summary: RangeRunSummary): RangeRunSummary['status'] {
+  if (summary.status === 'failed' || summary.status === 'stopped' || summary.status === 'completed') return summary.status
+  if (summary.status === 'queued' && summary.progress >= 2) return 'preparing'
+  if (summary.status === 'preparing' && summary.progress >= 22) return 'provisioning'
+  if (summary.status === 'provisioning' && summary.progress >= 34) return 'self_check'
+  if (summary.status === 'self_check' && summary.progress >= 45) return 'running'
+  if (summary.status === 'running' && summary.progress >= 78) return 'evidence_sealing'
+  if (summary.status === 'evidence_sealing' && summary.progress >= 84) return 'destroying'
+  if (summary.status === 'destroying' && summary.progress >= 89) return 'scoring'
+  if (summary.status === 'scoring' && summary.progress >= 96) return 'completed'
+  return summary.status
+}
+
+function stageForStatus(status: RangeRunSummary['status'], summary: RangeRunSummary) {
+  if (status === 'queued') return ['Queued', `排队位置：${summary.queuePosition ?? 1}，等待资源释放`]
+  if (status === 'preparing') return ['Preparing', '正在校验 CasePlan 与资源配额']
+  if (status === 'provisioning') return ['Provisioning', '正在准备靶场资源、网络和容器']
+  if (status === 'self_check') return ['SelfCheck', '正在执行环境和工具链健康检查']
+  if (status === 'running') {
+    if (summary.benchmark === 'CyberGym') return ['PoC Validation', '正在验证生成的漏洞利用脚本']
+    if (summary.benchmark === 'ExploitGym') return ['Exploit Execution', '正在执行受控 Exploit 并核验目标状态']
+    if (summary.benchmark === 'PatchEval') return ['Patch Testing', '正在运行功能测试与安全测试']
+    return ['Lateral Movement', 'Agent 正在从 DMZ 横向进入 Service Zone']
+  }
+  if (status === 'evidence_sealing') return ['EvidenceSealing', '正在封存证据快照与工具调用记录']
+  if (status === 'destroying') return ['Destroying', '正在销毁临时靶场资源']
+  if (status === 'scoring') return ['Verifier', '离线 Verifier 正在核验证据与评分']
+  if (status === 'completed') return ['Completed', '评分完成，可查看评测结果']
+  if (status === 'failed') return [summary.currentStage, summary.errorMessage ?? '任务异常，需要人工处理']
+  return [summary.currentStage, summary.stageDescription ?? '任务已停止']
+}
+
 function findResourceFallback(task: Task) {
   const environment = rangeEnvironments.find((item) => item.name === task.environment) ?? rangeEnvironments[0]
   const agent = agentProfiles.find((item) => item.name === task.agent) ?? agentProfiles[0]
@@ -214,6 +285,15 @@ export function RangeTaskProvider({ children }: { children: ReactNode }) {
   const [currentTask, setCurrentTask] = useState<Task | null>(() => readStorage(CURRENT_TASK_KEY, null))
   const [currentCasePlan, setCurrentCasePlan] = useState<CasePlan | null>(() => readStorage(CURRENT_CASE_PLAN_KEY, null))
   const [currentRun, setCurrentRun] = useState<RangeRun | null>(() => readStorage(CURRENT_RUN_KEY, null))
+  const [runSummaries, setRunSummaries] = useState<RangeRunSummary[]>(() => readStorage(RUN_SUMMARIES_KEY, initialRangeRunSummaries))
+  const [focusedRunId, setFocusedRunId] = useState<string | null>(() =>
+    readStorage(
+      FOCUSED_RUN_KEY,
+      [...initialRangeRunSummaries]
+        .filter((run) => run.status === 'running')
+        .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))[0]?.id ?? initialRangeRunSummaries[0]?.id ?? null,
+    ),
+  )
   const [draftProgress, setDraftProgressState] = useState<DraftProgress>(() =>
     normalizeDraftProgress(readStorage<Partial<DraftProgress> | null>(DRAFT_PROGRESS_KEY, null)),
   )
@@ -222,6 +302,8 @@ export function RangeTaskProvider({ children }: { children: ReactNode }) {
   useEffect(() => writeStorage(CURRENT_TASK_KEY, currentTask), [currentTask])
   useEffect(() => writeStorage(CURRENT_CASE_PLAN_KEY, currentCasePlan), [currentCasePlan])
   useEffect(() => writeStorage(CURRENT_RUN_KEY, currentRun), [currentRun])
+  useEffect(() => writeStorage(RUN_SUMMARIES_KEY, runSummaries), [runSummaries])
+  useEffect(() => writeStorage(FOCUSED_RUN_KEY, focusedRunId), [focusedRunId])
   useEffect(() => writeStorage(DRAFT_PROGRESS_KEY, draftProgress), [draftProgress])
 
   const setDraftProgress = useCallback((progress: DraftProgress) => {
@@ -243,6 +325,36 @@ export function RangeTaskProvider({ children }: { children: ReactNode }) {
     const { task, casePlan } = createTask(input, 'running')
     const run = buildRun(task, casePlan)
     setCurrentRun(run)
+    setFocusedRunId(run.id)
+    setRunSummaries((items) => [
+      {
+        id: run.id,
+        taskName: task.name,
+        category: task.benchmark ? 'benchmark' : 'scenario',
+        benchmark: task.benchmark as RangeRunSummary['benchmark'],
+        status: 'running',
+        progress: 8,
+        currentStage: 'Preparing',
+        stageDescription: '刚刚启动，正在准备 Mock RangeRun。',
+        environment: task.environment,
+        agent: task.agent,
+        model: task.model,
+        concurrency: input.runConfig.concurrency,
+        elapsedSeconds: 0,
+        estimatedRemainingSeconds: input.runConfig.timeoutMinutes * 60,
+        tokenUsed: 0,
+        tokenBudget: input.runConfig.tokenBudget,
+        costUsed: 0,
+        costBudget: input.runConfig.costBudget,
+        cpuCores: input.runConfig.cpuCores,
+        memoryGb: input.runConfig.memoryGb,
+        vmCount: task.benchmark ? 1 : 3,
+        containerCount: task.benchmark ? 4 : 8,
+        currentAction: '当前动作：初始化运行环境',
+        updatedAt: nowText(),
+      },
+      ...items.filter((item) => item.id !== run.id),
+    ])
     setTaskList((items) => items.map((item) => (item.id === task.id ? { ...item, status: 'running' } : item)))
     setDraftProgressState({ step: 0, runConfig: defaultRunConfig })
     return run
@@ -281,6 +393,7 @@ export function RangeTaskProvider({ children }: { children: ReactNode }) {
     setCurrentTask({ ...task, status: 'running' })
     setCurrentCasePlan(casePlan)
     setCurrentRun(run)
+    setFocusedRunId(run.id)
     setTaskList((items) => items.map((item) => (item.id === task.id ? { ...item, status: 'running' } : item)))
     return run
   }, [taskList])
@@ -289,6 +402,7 @@ export function RangeTaskProvider({ children }: { children: ReactNode }) {
     if (!currentRun) return null
     const stoppedRun: RangeRun = { ...currentRun, status: 'Stopped' }
     setCurrentRun(stoppedRun)
+    setRunSummaries((items) => items.map((item) => item.id === currentRun.id ? { ...item, status: 'stopped', currentStage: 'Stopped', stageDescription: '任务已手动停止', updatedAt: nowText() } : item))
     setTaskList((items) => items.map((item) => (item.id === currentRun.taskId ? { ...item, status: 'configured' } : item)))
     return stoppedRun
   }, [currentRun])
@@ -297,6 +411,7 @@ export function RangeTaskProvider({ children }: { children: ReactNode }) {
     if (!currentRun) return null
     const completedRun: RangeRun = { ...currentRun, status: 'Completed' }
     setCurrentRun(completedRun)
+    setRunSummaries((items) => items.map((item) => item.id === currentRun.id ? { ...item, status: 'completed', progress: 100, currentStage: 'Completed', stageDescription: '评分完成，可查看评测结果', updatedAt: nowText() } : item))
     setTaskList((items) => items.map((item) => (item.id === currentRun.taskId ? { ...item, status: 'completed' } : item)))
     return completedRun
   }, [currentRun])
@@ -309,12 +424,75 @@ export function RangeTaskProvider({ children }: { children: ReactNode }) {
     return copy
   }, [taskList])
 
+  const setFocusedRun = useCallback((runId: string) => {
+    const summary = runSummaries.find((item) => item.id === runId)
+    if (!summary) return null
+    setFocusedRunId(runId)
+    setCurrentRun(buildRunFromSummary(summary))
+    setCurrentTask(taskFromSummary(summary))
+    setCurrentCasePlan({
+      id: `CP-${summary.id}`,
+      taskId: `task-${summary.id}`,
+      taskName: summary.taskName,
+      environmentId: summary.environment,
+      environmentName: summary.environment,
+      agentId: summary.agent,
+      agentName: summary.agent,
+      modelId: summary.model,
+      modelName: summary.model,
+      runName: summary.taskName,
+      timeoutMinutes: Math.ceil((summary.elapsedSeconds + (summary.estimatedRemainingSeconds ?? 0)) / 60),
+      tokenBudget: summary.tokenBudget,
+      costBudget: summary.costBudget,
+      concurrency: summary.concurrency,
+      maxSteps: 80,
+      cpuCores: summary.cpuCores,
+      memoryGb: summary.memoryGb,
+      allowInternet: false,
+      enableForensics: true,
+      enableOfflineScoring: true,
+      autoStopCondition: 'Mock 多任务总览切换进入',
+      createdAt: summary.updatedAt,
+    })
+    return summary
+  }, [runSummaries])
+
+  const advanceRunSummaries = useCallback(() => {
+    setRunSummaries((items) => items.map((item) => {
+      if (item.status === 'failed' || item.status === 'stopped' || item.status === 'completed') return item
+      const active = item.status !== 'queued'
+      const progress = Math.min(100, item.progress + (item.status === 'queued' ? 0 : 1))
+      const status = nextStatus({ ...item, progress })
+      const [stage, description] = stageForStatus(status, item)
+      return {
+        ...item,
+        status,
+        progress: status === 'completed' ? 100 : progress,
+        currentStage: stage,
+        stageDescription: description,
+        elapsedSeconds: active ? item.elapsedSeconds + 240 : item.elapsedSeconds,
+        estimatedRemainingSeconds: item.estimatedRemainingSeconds ? Math.max(0, item.estimatedRemainingSeconds - 120) : item.estimatedRemainingSeconds,
+        tokenUsed: active ? Math.min(item.tokenBudget, item.tokenUsed + 4500) : item.tokenUsed,
+        costUsed: active ? Math.min(item.costBudget, item.costUsed + 2) : item.costUsed,
+        currentAction: status === 'queued' ? `排队位置：${item.queuePosition ?? 1}，预计启动时间更新中` : status === 'scoring' ? '评分进度：Verifier 正在核验证据' : item.currentAction,
+        updatedAt: nowText(),
+      }
+    }))
+  }, [])
+
+  const stopRunSummary = useCallback((runId: string) => {
+    setRunSummaries((items) => items.map((item) => item.id === runId ? { ...item, status: 'stopped', currentStage: 'Stopped', stageDescription: '任务已手动停止', updatedAt: nowText() } : item))
+    if (currentRun?.id === runId) setCurrentRun({ ...currentRun, status: 'Stopped' })
+  }, [currentRun])
+
   const value = useMemo(
     () => ({
       taskList,
       currentTask,
       currentCasePlan,
       currentRun,
+      runSummaries,
+      focusedRunId,
       draftProgress,
       setDraftProgress,
       createTask,
@@ -324,12 +502,17 @@ export function RangeTaskProvider({ children }: { children: ReactNode }) {
       stopRun,
       completeRun,
       duplicateTask,
+      setFocusedRun,
+      advanceRunSummaries,
+      stopRunSummary,
     }),
     [
       taskList,
       currentTask,
       currentCasePlan,
       currentRun,
+      runSummaries,
+      focusedRunId,
       draftProgress,
       setDraftProgress,
       createTask,
@@ -339,6 +522,9 @@ export function RangeTaskProvider({ children }: { children: ReactNode }) {
       stopRun,
       completeRun,
       duplicateTask,
+      setFocusedRun,
+      advanceRunSummaries,
+      stopRunSummary,
     ],
   )
 

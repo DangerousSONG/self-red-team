@@ -103,7 +103,7 @@ export default function App() {
   }
 
   const renderPage = () => {
-    if (activeId === 'home') return <RunOverviewPage onNavigate={handleNavigate} onOpenResult={openResult} />
+    if (activeId === 'home') return <RunOverviewPage onNavigate={handleNavigate} onOpenResult={openResult} onOpenDataset={openDataset} />
 
     if (activeId === 'rangerun') {
       return (

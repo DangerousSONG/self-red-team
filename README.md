@@ -4,6 +4,9 @@
 
 ## 本阶段新增
 
+- 运行总览主页升级为多任务运行态势总览，可同时查看运行中、排队中、评测中和异常任务。
+- 首页新增并发与资源态势，展示当前并发额度、CPU、内存、VM、Docker 容器、Token 和成本概况。
+- 首页支持卡片视图与紧凑列表、任务搜索、分类筛选和当前关注任务切换。
 - 数据中心从三类资产扩展为四类：轨迹数据集、CPT 语料库、漏洞数据、Benchmark 数据集。
 - 新增 Benchmark 数据集列表和详情门户，覆盖 CyberGym、ExploitGym、PatchEval 和自研综合评测集。
 - CPT 语料库和漏洞数据支持“训练选择模式”，可勾选数据集并发起基模训练。
@@ -13,6 +16,19 @@
 - 全部训练、指标、Checkpoint、Benchmark 对比和模型产物继续使用前端 Mock 状态与 localStorage 持久化。
 
 ## 完整用户路径
+
+### 多任务运行总览
+
+1. 进入“运行总览”。
+2. 查看顶部统计卡，确认任务总数、运行中、排队中、评测中、已完成、异常任务和当前并发。
+3. 在“运行中任务”看板中查看每个 RangeRun 的阶段、进度、Agent、环境、Token 和成本预算。
+4. 使用“全部 / 场景演练 / 基准评测 / 运行中 / 排队中 / 评测中 / 异常”筛选任务。
+5. 通过搜索框按任务名称或 Run ID 查找任务。
+6. 点击星标或“查看 CasePlan”将任务设为当前关注。
+7. 点击“进入控制台”进入对应 RangeRun 控制台。
+8. 在左下角“当前关注”卡片中点击“切换”，可快速切换关注任务。
+
+### 数据沉淀与训练
 
 1. 进入“数据中心”。
 2. 查看四类数据资产入口。
@@ -53,6 +69,37 @@
 - CPT 语料库：用于安全领域持续预训练，可勾选数据集发起基模训练。
 - 漏洞数据：用于增强模型对漏洞描述、漏洞关系、CVE/CWE 和安全知识的理解，可勾选数据集发起基模训练。
 - Benchmark 数据集：用于训练前后能力评测，包含 CyberGym、ExploitGym、PatchEval 和自研综合评测集，本阶段默认不作为训练数据。
+
+## 运行总览多任务逻辑
+
+主页使用 `RangeRunSummary[]` 展示多任务态势，类型定义在 `src/types/range.ts`。
+
+状态映射：
+
+- `queued`：排队中
+- `preparing` / `provisioning` / `self_check` / `running`：运行中
+- `evidence_sealing` / `destroying` / `scoring` / `evaluating`：评测中
+- `completed`：已完成
+- `failed` / `stopped`：异常任务
+
+默认排序：
+
+1. Failed
+2. Running
+3. Preparing / Provisioning
+4. Scoring / Evaluating
+5. Queued
+
+点击任务卡片的“进入控制台”时，会将该任务映射为现有 `currentRun` 并跳转到 RangeRun 控制台。RangeRun 控制台核心布局保持不变。
+
+并发与资源统计：
+
+- 当前并发：运行中与评测中任务的 `concurrency` 汇总。
+- 最大并发：Mock 固定为 10。
+- CPU / 内存 / VM / Docker 容器：按运行中和评测中任务的资源字段汇总。
+- Failed、Stopped、Completed 不占用当前并发额度。
+
+Mock 任务每隔数秒轻量推进一次进度、耗时、Token 和成本，数据保存在 localStorage，刷新后保留。
 
 ## Benchmark 数据集
 

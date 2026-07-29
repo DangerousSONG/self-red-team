@@ -107,7 +107,23 @@ export interface CasePlan {
   createdAt: string
 }
 
-export type RangeRunStatus = 'Queued' | 'Running' | 'Completed' | 'Stopped'
+export type RangeRunStatus =
+  | 'Queued'
+  | 'Running'
+  | 'Completed'
+  | 'Stopped'
+  | 'queued'
+  | 'preparing'
+  | 'provisioning'
+  | 'self_check'
+  | 'running'
+  | 'evidence_sealing'
+  | 'destroying'
+  | 'scoring'
+  | 'evaluating'
+  | 'completed'
+  | 'failed'
+  | 'stopped'
 
 export interface RangeRun {
   id: string
@@ -119,6 +135,49 @@ export interface RangeRun {
   model: string
   status: RangeRunStatus
   startedAt: string
+}
+
+export interface RangeRunSummary {
+  id: string
+  taskName: string
+  category: 'scenario' | 'benchmark'
+  benchmark?: 'CyberGym' | 'ExploitGym' | 'PatchEval'
+  status: Extract<
+    RangeRunStatus,
+    | 'queued'
+    | 'preparing'
+    | 'provisioning'
+    | 'self_check'
+    | 'running'
+    | 'evidence_sealing'
+    | 'destroying'
+    | 'scoring'
+    | 'evaluating'
+    | 'completed'
+    | 'failed'
+    | 'stopped'
+  >
+  progress: number
+  currentStage: string
+  stageDescription?: string
+  environment: string
+  agent: string
+  model: string
+  concurrency: number
+  elapsedSeconds: number
+  estimatedRemainingSeconds?: number
+  tokenUsed: number
+  tokenBudget: number
+  costUsed: number
+  costBudget: number
+  cpuCores: number
+  memoryGb: number
+  vmCount: number
+  containerCount: number
+  queuePosition?: number
+  errorMessage?: string
+  currentAction?: string
+  updatedAt: string
 }
 
 export interface RunConfig {

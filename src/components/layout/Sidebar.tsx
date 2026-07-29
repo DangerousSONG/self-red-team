@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { BarChart3, Brain, Database, FileText, LayoutDashboard, Network, PlayCircle, type LucideIcon } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useRangeTasks } from '@/hooks/useRangeTasks'
@@ -26,7 +27,10 @@ interface SidebarProps {
 }
 
 export function Sidebar({ activeId, onNavigate }: SidebarProps) {
-  const { currentRun, draftProgress } = useRangeTasks()
+  const { currentRun, draftProgress, runSummaries, focusedRunId, setFocusedRun } = useRangeTasks()
+  const [switcherOpen, setSwitcherOpen] = useState(false)
+  const focusedRun = runSummaries.find((run) => run.id === focusedRunId) ?? runSummaries.find((run) => run.status === 'running') ?? null
+  const switchableRuns = runSummaries.filter((run) => !['completed', 'stopped'].includes(run.status))
 
   const activeGroup = activeId.startsWith('result') || activeId === 'run-data'
     ? 'results'
@@ -79,29 +83,65 @@ export function Sidebar({ activeId, onNavigate }: SidebarProps) {
       </nav>
 
       <div className="space-y-2 border-t border-white/10 p-3">
-        <button
-          type="button"
-          onClick={() => onNavigate('rangerun')}
-          className="w-full rounded-lg border border-white/10 bg-white/5 p-3 text-left transition hover:bg-white/10"
-        >
+        <div className="relative rounded-lg border border-white/10 bg-white/5 p-3 text-left">
           <div className="font-mono text-[10px] uppercase tracking-[0.14em] text-white/45">
-            当前演练
+            当前关注
           </div>
-          {currentRun ? (
+          {focusedRun || currentRun ? (
             <>
               <div className="mt-1.5 text-[12px] font-medium leading-snug text-white">
-                {currentRun.taskName}
+                {focusedRun?.taskName ?? currentRun?.taskName}
               </div>
               <div className="mt-2 flex items-center gap-1.5 text-[11px] text-emerald-300">
-                <span className={cn('h-1.5 w-1.5 rounded-full bg-emerald-400', currentRun.status === 'Running' && 'status-pulse')} />
-                RangeRun / {currentRun.status}
+                <span className={cn('h-1.5 w-1.5 rounded-full bg-emerald-400', (focusedRun?.status === 'running' || currentRun?.status === 'Running') && 'status-pulse')} />
+                {focusedRun ? `${statusText(focusedRun.status)} / ${focusedRun.currentStage}` : `RangeRun / ${currentRun?.status}`}
               </div>
-              <div className="mt-1 font-mono text-[10px] text-white/40">{currentRun.id}</div>
+              <div className="mt-1 font-mono text-[10px] text-white/40">{focusedRun?.id ?? currentRun?.id}</div>
+              <div className="mt-2 flex items-center gap-2">
+                <button
+                  type="button"
+                  className="rounded-md bg-white/10 px-2 py-1 text-[11px] text-white/80 hover:bg-white/15"
+                  onClick={() => {
+                    if (focusedRun) setFocusedRun(focusedRun.id)
+                    onNavigate('rangerun')
+                  }}
+                >
+                  进入
+                </button>
+                <button
+                  type="button"
+                  className="rounded-md bg-white/10 px-2 py-1 text-[11px] text-white/80 hover:bg-white/15"
+                  onClick={() => setSwitcherOpen((open) => !open)}
+                >
+                  切换
+                </button>
+              </div>
             </>
           ) : (
-            <div className="mt-2 text-[12px] leading-5 text-white/60">暂无正在运行的演练</div>
+            <div className="mt-2 text-[12px] leading-5 text-white/60">暂无关注任务</div>
           )}
-        </button>
+          {switcherOpen ? (
+            <div className="absolute bottom-full left-0 z-30 mb-2 max-h-[320px] w-[300px] overflow-y-auto rounded-xl border border-white/10 bg-[#102b4a] p-2 shadow-xl">
+              {switchableRuns.map((run) => (
+                <button
+                  key={run.id}
+                  type="button"
+                  className="w-full rounded-lg px-2.5 py-2 text-left hover:bg-white/10"
+                  onClick={() => {
+                    setFocusedRun(run.id)
+                    setSwitcherOpen(false)
+                  }}
+                >
+                  <div className="line-clamp-1 text-[12px] font-medium text-white">{run.taskName}</div>
+                  <div className="mt-1 flex items-center justify-between gap-2 text-[10px] text-white/55">
+                    <span>{statusText(run.status)}</span>
+                    <span>{run.progress}%</span>
+                  </div>
+                </button>
+              ))}
+            </div>
+          ) : null}
+        </div>
 
         {activeId === 'tasks' ? (
           <div className="rounded-lg border border-white/10 bg-white/[0.03] p-3">
@@ -116,4 +156,21 @@ export function Sidebar({ activeId, onNavigate }: SidebarProps) {
       </div>
     </aside>
   )
+}
+
+function statusText(status: string) {
+  return {
+    queued: 'Queued',
+    preparing: 'Preparing',
+    provisioning: 'Provisioning',
+    self_check: 'SelfCheck',
+    running: 'Running',
+    evidence_sealing: 'Evidence',
+    destroying: 'Destroying',
+    scoring: 'Scoring',
+    evaluating: 'Evaluating',
+    completed: 'Completed',
+    failed: 'Failed',
+    stopped: 'Stopped',
+  }[status] ?? status
 }
