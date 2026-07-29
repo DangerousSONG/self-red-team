@@ -31,7 +31,7 @@ export default function App() {
   const [selectedRunId, setSelectedRunId] = useState('')
   const [selectedDatasetId, setSelectedDatasetId] = useState('')
   const [selectedCorpusId, setSelectedCorpusId] = useState('')
-  const [selectedVulnerabilityId, setSelectedVulnerabilityId] = useState('')
+  const [selectedVulnerabilityDatasetId, setSelectedVulnerabilityDatasetId] = useState('')
 
   const handleNavigate = (id: string) => {
     if (activeId === 'tasks' && id !== 'tasks' && tasksDirty) {
@@ -61,24 +61,20 @@ export default function App() {
     handleNavigate('cpt-detail')
   }
 
-  const openVulnerability = (uuid: string) => {
-    setSelectedVulnerabilityId(uuid)
+  const openVulnerabilityDataset = (id: string) => {
+    setSelectedVulnerabilityDatasetId(id)
     handleNavigate('vulnerability-detail')
   }
 
   const leaveTasks = (saveDraft: boolean) => {
-    if (saveDraft) {
-      window.dispatchEvent(new CustomEvent('range-task-save-draft'))
-    }
+    if (saveDraft) window.dispatchEvent(new CustomEvent('range-task-save-draft'))
     setTasksDirty(false)
     setActiveId(pendingNavId ?? 'home')
     setPendingNavId(null)
   }
 
   const renderPage = () => {
-    if (activeId === 'home') {
-      return <RunOverviewPage onNavigate={handleNavigate} onOpenResult={openResult} />
-    }
+    if (activeId === 'home') return <RunOverviewPage onNavigate={handleNavigate} onOpenResult={openResult} />
 
     if (activeId === 'rangerun') {
       return (
@@ -98,29 +94,22 @@ export default function App() {
     }
 
     if (activeId === 'results') {
-      return <ResultsPage onOpenResult={openResult} onProcessData={processRunData} onNavigate={handleNavigate} />
+      return (
+        <ResultsPage
+          onOpenResult={openResult}
+          onProcessData={processRunData}
+          onOpenDataset={openDataset}
+          onNavigate={handleNavigate}
+        />
+      )
     }
 
     if (activeId === 'result-detail') {
-      return (
-        <ResultDetailPage
-          runId={selectedRunId}
-          onNavigate={handleNavigate}
-          onProcessData={processRunData}
-          onOpenDataset={openDataset}
-        />
-      )
+      return <ResultDetailPage runId={selectedRunId} onNavigate={handleNavigate} onProcessData={processRunData} onOpenDataset={openDataset} />
     }
 
     if (activeId === 'run-data') {
-      return (
-        <RunDataDispositionPage
-          runId={selectedRunId}
-          onBackResult={openResult}
-          onOpenDataset={openDataset}
-          onNavigate={handleNavigate}
-        />
-      )
+      return <RunDataDispositionPage runId={selectedRunId} onBackResult={openResult} onOpenDataset={openDataset} onNavigate={handleNavigate} />
     }
 
     if (activeId === 'data-center') return <DataCenterPage onNavigate={handleNavigate} />
@@ -128,8 +117,8 @@ export default function App() {
     if (activeId === 'trajectory-detail') return <TrajectoryDatasetDetailPage datasetId={selectedDatasetId} onNavigate={handleNavigate} />
     if (activeId === 'cpt') return <CptCorpusPage onOpenCorpus={openCorpus} />
     if (activeId === 'cpt-detail') return <CptCorpusDetailPage id={selectedCorpusId} onNavigate={handleNavigate} />
-    if (activeId === 'vulnerabilities') return <VulnerabilityDataPage onOpenVulnerability={openVulnerability} />
-    if (activeId === 'vulnerability-detail') return <VulnerabilityDetailPage uuid={selectedVulnerabilityId} onNavigate={handleNavigate} />
+    if (activeId === 'vulnerabilities') return <VulnerabilityDataPage onOpenVulnerability={openVulnerabilityDataset} />
+    if (activeId === 'vulnerability-detail') return <VulnerabilityDetailPage uuid={selectedVulnerabilityDatasetId} onNavigate={handleNavigate} />
 
     return <DataCenterPage onNavigate={handleNavigate} />
   }

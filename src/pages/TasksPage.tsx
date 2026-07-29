@@ -221,7 +221,7 @@ export function TasksPage({ onNavigate, onDirtyChange }: TasksPageProps) {
             </Badge>
             <h1 className="mt-2 text-2xl font-semibold tracking-tight text-[var(--color-ink)]">评测任务中心</h1>
             <p className="mt-1 text-sm text-[var(--color-ink-secondary)]">
-              选择任务、配置环境与智能体，创建一次可复现的攻防或 Benchmark 评测。
+              选择任务、配置环境与智能体，创建一次可复现的场景演练或基准评测。
             </p>
           </div>
           {notice ? <div className="rounded-lg border border-[var(--color-border)] bg-white px-3 py-2 text-sm text-[var(--color-success)] shadow-[var(--shadow-card)]">{notice}</div> : null}
@@ -247,7 +247,7 @@ export function TasksPage({ onNavigate, onDirtyChange }: TasksPageProps) {
                 <div className="space-y-4">
                   <div className="grid gap-3 md:grid-cols-2">
                     <TaskCategoryButton active={taskCategoryTab === 'scenario'} title="场景演练" description="在真实或仿真的多节点网络环境中评测黑盒、灰盒和长程攻防能力" onClick={() => setTaskCategoryTab('scenario')} />
-                    <TaskCategoryButton active={taskCategoryTab === 'benchmark'} title="Benchmark 评测" description="标准化评测漏洞挖掘、漏洞利用和漏洞修复 Agent 的能力" onClick={() => setTaskCategoryTab('benchmark')} />
+                    <TaskCategoryButton active={taskCategoryTab === 'benchmark'} title="基准评测" description="标准化评测漏洞挖掘、漏洞利用和漏洞修复 Agent 的能力" onClick={() => setTaskCategoryTab('benchmark')} />
                   </div>
                   <div className="grid gap-4 md:grid-cols-2 2xl:grid-cols-3">
                     {taskTemplates.filter((task) => task.category === taskCategoryTab).map((task) => {

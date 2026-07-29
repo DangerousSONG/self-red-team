@@ -13,15 +13,13 @@ interface ResultDetailPageProps {
   onOpenDataset: (datasetId: string) => void
 }
 
-export function ResultDetailPage({
-  runId,
-  onNavigate,
-  onProcessData,
-  onOpenDataset,
-}: ResultDetailPageProps) {
+export function ResultDetailPage({ runId, onNavigate, onProcessData, onOpenDataset }: ResultDetailPageProps) {
   const { results, trajectoryDatasets } = useDataCenter()
   const result = results.find((item) => item.runId === runId) ?? results[0]
-  const relatedDataset = trajectoryDatasets.find((dataset) => dataset.sourceRunIds.includes(result.runId))
+  const relatedDataset =
+    result.dispositionDatasetId
+      ? trajectoryDatasets.find((dataset) => dataset.id === result.dispositionDatasetId)
+      : trajectoryDatasets.find((dataset) => dataset.sourceRunIds.includes(result.runId))
 
   return (
     <main className="flex-1 overflow-x-hidden px-6 py-5">
@@ -36,7 +34,7 @@ export function ResultDetailPage({
             <p className="mt-1 font-mono text-xs text-[var(--color-ink-muted)]">{result.runId}</p>
           </div>
           <div className="flex flex-wrap gap-2">
-            <Button variant="secondary" onClick={() => onNavigate('home')}>
+            <Button variant="secondary" onClick={() => onNavigate('rangerun')}>
               <ArrowLeft className="h-4 w-4" />
               返回 RangeRun
             </Button>
@@ -52,18 +50,16 @@ export function ResultDetailPage({
         </div>
 
         <Card>
-          <CardHeader>
-            <CardTitle>Verdict 总览</CardTitle>
-          </CardHeader>
+          <CardHeader><CardTitle>{result.taskCategory === '基准评测' ? '基准评测总览' : '场景演练总览'}</CardTitle></CardHeader>
           <CardContent className="grid gap-3 md:grid-cols-4 xl:grid-cols-8">
             <Metric label="Verdict" value={<VerdictBadge verdict={result.verdict} />} />
             <Metric label="综合评分" value={String(result.score)} />
             <Metric label="任务完成度" value={`${result.progress}%`} />
-            <Metric label="成功步骤" value="7" />
-            <Metric label="总步骤" value="8" />
             <Metric label="总耗时" value={result.duration} />
             <Metric label="Token 使用" value={result.metrics.find((item) => item.label.includes('Token'))?.value ?? '280k'} />
             <Metric label="总成本" value={`${result.cost} 元`} />
+            <Metric label={result.taskCategory === '基准评测' ? '评测基准' : '场景'} value={result.benchmark ?? result.scenario ?? '-'} />
+            <Metric label={result.taskCategory === '基准评测' ? '评测对象' : '最终攻击阶段'} value={result.evaluationTarget ?? result.attackStage ?? '-'} />
           </CardContent>
         </Card>
 
@@ -83,16 +79,12 @@ export function ResultDetailPage({
           </Card>
 
           <Card>
-            <CardHeader>
-              <CardTitle>任务过程</CardTitle>
-            </CardHeader>
+            <CardHeader><CardTitle>任务过程</CardTitle></CardHeader>
             <CardContent>
               <ol className="space-y-2">
                 {result.process.map((step, index) => (
                   <li key={step} className="flex items-center gap-3 rounded-lg border border-[var(--color-border)] bg-white p-2.5">
-                    <Badge variant={index === result.process.length - 1 ? 'success' : 'outline'}>
-                      {index + 1}
-                    </Badge>
+                    <Badge variant={index === result.process.length - 1 ? 'success' : 'outline'}>{index + 1}</Badge>
                     <span className="text-sm font-medium">{step}</span>
                   </li>
                 ))}
@@ -102,9 +94,7 @@ export function ResultDetailPage({
         </div>
 
         <Card>
-          <CardHeader>
-            <CardTitle>关键证据</CardTitle>
-          </CardHeader>
+          <CardHeader><CardTitle>关键证据</CardTitle></CardHeader>
           <CardContent className="grid gap-3 xl:grid-cols-2">
             {result.evidence.map((item) => (
               <div key={item.id} className="rounded-lg border border-[var(--color-border)] bg-white p-3">
@@ -113,9 +103,7 @@ export function ResultDetailPage({
                     <div className="text-sm font-semibold">{item.title}</div>
                     <div className="mt-1 text-xs text-[var(--color-ink-muted)]">{item.type} / {item.snapshotId}</div>
                   </div>
-                  <Button size="sm" variant="ghost" onClick={() => navigator.clipboard?.writeText(item.raw)}>
-                    复制内容
-                  </Button>
+                  <Button size="sm" variant="ghost" onClick={() => navigator.clipboard?.writeText(item.raw)}>复制内容</Button>
                 </div>
                 <p className="mt-2 text-sm leading-6 text-[var(--color-ink-secondary)]">{item.summary}</p>
                 <pre className="mt-2 overflow-x-auto rounded-md bg-[#0b1220] p-3 text-xs text-[#d1e7dd]">{item.raw}</pre>
@@ -126,9 +114,7 @@ export function ResultDetailPage({
 
         <div className="grid gap-4 xl:grid-cols-2">
           <Card>
-            <CardHeader>
-              <CardTitle>结果归因</CardTitle>
-            </CardHeader>
+            <CardHeader><CardTitle>结果归因</CardTitle></CardHeader>
             <CardContent className="grid gap-3 md:grid-cols-2">
               <Reason title="成功原因" items={result.attribution.successReasons} />
               <Reason title="失败原因" items={result.attribution.failureReasons} />
@@ -140,9 +126,7 @@ export function ResultDetailPage({
           </Card>
 
           <Card>
-            <CardHeader>
-              <CardTitle>数据产物与沉淀状态</CardTitle>
-            </CardHeader>
+            <CardHeader><CardTitle>数据产物与沉淀状态</CardTitle></CardHeader>
             <CardContent className="space-y-3">
               {result.artifacts.map((artifact) => (
                 <div key={artifact.id} className="flex items-center justify-between rounded-lg border border-[var(--color-border)] bg-white p-3">
@@ -157,20 +141,16 @@ export function ResultDetailPage({
                 <div className="rounded-lg border border-[var(--color-warning)]/25 bg-[var(--color-warning-soft)] p-3">
                   <div className="font-semibold text-[var(--color-warning)]">本次运行产生了可沉淀的数据产物</div>
                   <p className="mt-1 text-sm text-[var(--color-ink-secondary)]">可以新建轨迹数据集、加入已有数据集，或暂不处理。</p>
-                  <div className="mt-2 flex gap-2">
-                    <Button size="sm" onClick={() => onProcessData(result.runId)}>进入数据处理</Button>
-                  </div>
+                  <Button className="mt-2" size="sm" onClick={() => onProcessData(result.runId)}>进入数据处理</Button>
                 </div>
               ) : (
                 <div className="rounded-lg border border-[var(--color-success)]/25 bg-[var(--color-success-soft)] p-3">
                   <div className="font-semibold text-[var(--color-success)]">数据已处理：{statusText(result.dataDispositionStatus)}</div>
                   <div className="mt-1 text-sm text-[var(--color-ink-secondary)]">
-                    数据条数 {result.artifacts.reduce((sum, item) => sum + item.count, 0)} / 处理时间 {result.completedAt}
+                    {result.dispositionDatasetName ? `目标数据集：${result.dispositionDatasetName}` : `数据条数：${result.artifacts.reduce((sum, item) => sum + item.count, 0)}`}
                   </div>
                   {relatedDataset ? (
-                    <Button className="mt-2" size="sm" variant="secondary" onClick={() => onOpenDataset(relatedDataset.id)}>
-                      查看数据集
-                    </Button>
+                    <Button className="mt-2" size="sm" variant="secondary" onClick={() => onOpenDataset(relatedDataset.id)}>查看数据集</Button>
                   ) : null}
                 </div>
               )}
@@ -195,9 +175,7 @@ function Reason({ title, items }: { title: string; items: string[] }) {
   return (
     <div>
       <div className="mb-2 text-sm font-semibold">{title}</div>
-      <ul className="space-y-1 text-sm text-[var(--color-ink-secondary)]">
-        {items.map((item) => <li key={item}>- {item}</li>)}
-      </ul>
+      <ul className="space-y-1 text-sm text-[var(--color-ink-secondary)]">{items.map((item) => <li key={item}>- {item}</li>)}</ul>
     </div>
   )
 }

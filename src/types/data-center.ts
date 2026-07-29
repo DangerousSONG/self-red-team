@@ -8,8 +8,14 @@ export type DataDispositionStatus =
 export interface EvaluationResult {
   runId: string
   taskName: string
-  taskCategory: '场景演练' | 'Benchmark 评测'
+  taskCategory: '场景演练' | '基准评测'
   benchmark?: 'CyberGym' | 'ExploitGym' | 'PatchEval'
+  evaluationTarget?: string
+  scenario?: string
+  environmentKind?: string
+  attackStage?: string
+  riskCount?: number
+  targetImpact?: string
   agent: string
   model: string
   verdict: ResultVerdict
@@ -19,6 +25,8 @@ export interface EvaluationResult {
   cost: number
   completedAt: string
   dataDispositionStatus: DataDispositionStatus
+  dispositionDatasetId?: string
+  dispositionDatasetName?: string
   metrics: Array<{ label: string; value: string; tone: 'brand' | 'success' | 'warning' | 'danger' }>
   process: string[]
   evidence: EvidenceItem[]
@@ -127,6 +135,8 @@ export interface DataDispositionJob {
 export interface DataCenterState {
   results: EvaluationResult[]
   trajectoryDatasets: TrajectoryDataset[]
+  cptDatasets: import('@/types/dataset').CptCorpusDataset[]
+  vulnerabilityDatasets: import('@/types/dataset').VulnerabilityDataset[]
   traces: TraceRecord[]
   cptCorpus: CptCorpusItem[]
   vulnerabilityRecords: import('@/types/vulnerability').VulnerabilityRecord[]

@@ -8,6 +8,7 @@ import {
   type ReactNode,
 } from 'react'
 import { initialCptCorpus } from '@/lib/mock-data/data-center/cpt-corpus'
+import { initialCptDatasets, initialVulnerabilityDatasets } from '@/lib/mock-data/data-center/datasets'
 import { initialResults } from '@/lib/mock-data/data-center/results'
 import {
   initialTraces,
@@ -23,14 +24,17 @@ import type {
   TraceRecord,
   TrajectoryDataset,
 } from '@/types/data-center'
+import type { CptCorpusDataset, VulnerabilityDataset } from '@/types/dataset'
 import type { RangeRun } from '@/types/range'
 import type { VulnerabilityRecord } from '@/types/vulnerability'
 
-const DATA_CENTER_KEY = 'self-red-team.data-center'
+const DATA_CENTER_KEY = 'self-red-team.data-center.v3'
 
 const initialState: DataCenterState = {
   results: initialResults,
   trajectoryDatasets: initialTrajectoryDatasets,
+  cptDatasets: initialCptDatasets,
+  vulnerabilityDatasets: initialVulnerabilityDatasets,
   traces: initialTraces,
   cptCorpus: initialCptCorpus,
   vulnerabilityRecords: initialVulnerabilityRecords,
@@ -49,14 +53,18 @@ interface DataDispositionInput {
 
 interface DataCenterContextValue extends DataCenterState {
   generateResult: (run: RangeRun) => EvaluationResult
-  updateDataDispositionStatus: (runId: string, status: DataDispositionStatus) => void
+  updateDataDispositionStatus: (
+    runId: string,
+    status: DataDispositionStatus,
+    dataset?: { id: string; name: string },
+  ) => void
   createTrajectoryDataset: (input: DataDispositionInput) => TrajectoryDataset
   appendToTrajectoryDataset: (input: DataDispositionInput) => TrajectoryDataset | null
   skipDataDisposition: (runId: string) => void
   generateCptCandidates: (runId: string) => CptCorpusItem[]
   createVulnerabilityRecord: (runId: string) => VulnerabilityRecord
   linkVulnerabilityRecord: (uuid: string, runId: string) => void
-  processRunData: (input: DataDispositionInput) => { datasetId?: string }
+  processRunData: (input: DataDispositionInput) => { datasetId?: string; datasetName?: string }
 }
 
 const DataCenterContext = createContext<DataCenterContextValue | null>(null)
@@ -87,53 +95,78 @@ function uniqueId(prefix: string) {
   return `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`
 }
 
-function resultFromRun(run: RangeRun): EvaluationResult {
-  const benchmark = run.taskName.includes('CyberGym')
-    ? 'CyberGym'
-    : run.taskName.includes('ExploitGym')
-      ? 'ExploitGym'
-      : run.taskName.includes('PatchEval')
-        ? 'PatchEval'
-        : undefined
+function benchmarkFromTask(taskName: string): EvaluationResult['benchmark'] {
+  if (taskName.includes('CyberGym')) return 'CyberGym'
+  if (taskName.includes('ExploitGym')) return 'ExploitGym'
+  if (taskName.includes('PatchEval')) return 'PatchEval'
+  return undefined
+}
 
-  const metrics =
-    benchmark === 'CyberGym'
-      ? [
-          { label: '漏洞定位正确率', value: '84%', tone: 'success' as const },
-          { label: '漏洞验证成功率', value: '78%', tone: 'brand' as const },
-          { label: 'PoC 有效性', value: '82%', tone: 'success' as const },
-          { label: '平均步骤数', value: '24', tone: 'warning' as const },
-          { label: 'Token 成本', value: '280k', tone: 'brand' as const },
-        ]
-      : benchmark === 'ExploitGym'
-        ? [
-            { label: 'Exploit 成功率', value: '76%', tone: 'success' as const },
-            { label: 'Payload 有效性', value: '80%', tone: 'brand' as const },
-            { label: '目标达成情况', value: 'Success', tone: 'success' as const },
-            { label: '稳定复现次数', value: '3/3', tone: 'success' as const },
-            { label: 'Token 成本', value: '240k', tone: 'brand' as const },
-          ]
-        : benchmark === 'PatchEval'
-          ? [
-              { label: '漏洞修复率', value: '88%', tone: 'success' as const },
-              { label: '功能测试通过率', value: '92%', tone: 'success' as const },
-              { label: '安全测试通过率', value: '86%', tone: 'brand' as const },
-              { label: '回归测试通过率', value: '90%', tone: 'success' as const },
-              { label: 'Patch 质量评分', value: '82', tone: 'brand' as const },
-            ]
-          : [
-              { label: '攻击成功率', value: '72%', tone: 'brand' as const },
-              { label: '任务完成度', value: '86%', tone: 'success' as const },
-              { label: '风险等级', value: 'High', tone: 'danger' as const },
-              { label: '漏洞数量', value: '3', tone: 'warning' as const },
-              { label: '证据完整性', value: '94%', tone: 'success' as const },
-            ]
+function evaluationTarget(benchmark?: EvaluationResult['benchmark']) {
+  if (benchmark === 'CyberGym') return '漏洞挖掘 Agent'
+  if (benchmark === 'ExploitGym') return '漏洞利用 Agent'
+  if (benchmark === 'PatchEval') return '漏洞修复 Agent'
+  return '攻防演练 Agent'
+}
+
+function resultMetrics(benchmark?: EvaluationResult['benchmark']) {
+  if (benchmark === 'CyberGym') {
+    return [
+      { label: '漏洞定位正确率', value: '84%', tone: 'success' as const },
+      { label: '漏洞验证成功率', value: '78%', tone: 'brand' as const },
+      { label: 'PoC 有效性', value: '82%', tone: 'success' as const },
+      { label: '平均步骤数', value: '24', tone: 'warning' as const },
+      { label: 'Token 使用', value: '280k', tone: 'brand' as const },
+      { label: '综合得分', value: '84', tone: 'brand' as const },
+    ]
+  }
+  if (benchmark === 'ExploitGym') {
+    return [
+      { label: 'Exploit 成功率', value: '76%', tone: 'success' as const },
+      { label: 'Payload 有效性', value: '80%', tone: 'brand' as const },
+      { label: '目标达成率', value: '86%', tone: 'success' as const },
+      { label: '稳定复现次数', value: '3/3', tone: 'success' as const },
+      { label: 'Token 使用', value: '240k', tone: 'brand' as const },
+      { label: '综合得分', value: '82', tone: 'brand' as const },
+    ]
+  }
+  if (benchmark === 'PatchEval') {
+    return [
+      { label: '漏洞修复率', value: '88%', tone: 'success' as const },
+      { label: '功能测试通过率', value: '92%', tone: 'success' as const },
+      { label: '安全测试通过率', value: '86%', tone: 'brand' as const },
+      { label: '回归测试通过率', value: '90%', tone: 'success' as const },
+      { label: 'Patch 质量', value: '82', tone: 'brand' as const },
+      { label: '综合得分', value: '84', tone: 'brand' as const },
+    ]
+  }
+  return [
+    { label: '攻击成功率', value: '72%', tone: 'brand' as const },
+    { label: '任务完成度', value: '86%', tone: 'success' as const },
+    { label: '当前或最终攻击阶段', value: 'Impact', tone: 'warning' as const },
+    { label: '风险等级', value: 'High', tone: 'danger' as const },
+    { label: '漏洞数量', value: '3', tone: 'warning' as const },
+    { label: '目标资产影响', value: 'vault01 reached', tone: 'danger' as const },
+    { label: '证据完整性', value: '94%', tone: 'success' as const },
+    { label: '总成本', value: '72 元', tone: 'brand' as const },
+  ]
+}
+
+function resultFromRun(run: RangeRun, existing?: EvaluationResult): EvaluationResult {
+  const benchmark = benchmarkFromTask(run.taskName)
+  const taskCategory = benchmark ? '基准评测' : '场景演练'
 
   return {
     runId: run.id,
     taskName: run.taskName,
-    taskCategory: benchmark ? 'Benchmark 评测' : '场景演练',
+    taskCategory,
     benchmark,
+    evaluationTarget: evaluationTarget(benchmark),
+    scenario: benchmark ? undefined : '企业内网横向移动',
+    environmentKind: benchmark ? 'Docker' : 'VM + Docker',
+    attackStage: benchmark ? undefined : 'Impact',
+    riskCount: benchmark ? undefined : 3,
+    targetImpact: benchmark ? undefined : 'vault01 访问成功，证据链已封存',
     agent: run.agent,
     model: run.model,
     verdict: 'Success',
@@ -142,8 +175,10 @@ function resultFromRun(run: RangeRun): EvaluationResult {
     duration: '64 min',
     cost: 72,
     completedAt: nowText(),
-    dataDispositionStatus: 'unhandled',
-    metrics,
+    dataDispositionStatus: existing?.dataDispositionStatus ?? 'unhandled',
+    dispositionDatasetId: existing?.dispositionDatasetId,
+    dispositionDatasetName: existing?.dispositionDatasetName,
+    metrics: resultMetrics(benchmark),
     process: benchmark
       ? benchmark === 'PatchEval'
         ? ['源码分析', '漏洞定位', 'Patch 生成', '功能测试', '安全测试']
@@ -188,6 +223,54 @@ function resultFromRun(run: RangeRun): EvaluationResult {
   }
 }
 
+function makeTracesForDataset(datasetId: string, runId: string): TraceRecord[] {
+  return Array.from({ length: 8 }, (_, index) => ({
+    id: uniqueId('trace'),
+    datasetId,
+    runId,
+    task: `Run ${runId} 沉淀轨迹`,
+    agent: 'Mock Agent',
+    model: 'Mock InternLM',
+    verdict: index % 4 === 0 ? 'Partial' : 'Success',
+    steps: 10 + index,
+    token: 90000 + index * 5000,
+    cost: 18 + index,
+    quality: index % 3 === 0 ? '高' : '中高',
+    createdAt: nowText(),
+    observation: 'Observation 摘要：环境状态已记录。',
+    planningSummary: '结构化规划摘要：分解目标、执行工具、验证结果。',
+    action: '执行受控工具调用。',
+    toolCall: 'tool.run({ name: "mock_tool" })',
+    toolResult: '工具返回已脱敏结构化结果。',
+    feedback: 'Verifier 标记该回合可用于训练候选。',
+    finalResult: '完成',
+    score: 78 + index,
+    evidenceRef: uniqueId('SNAP'),
+  }))
+}
+
+function bumpCptDataset(dataset: CptCorpusDataset): CptCorpusDataset {
+  return {
+    ...dataset,
+    documentCount: dataset.documentCount + 1,
+    tokenTotal: dataset.tokenTotal + 1800,
+    recordCount: dataset.recordCount + 1,
+    weeklyAdded: dataset.weeklyAdded + 1,
+    updatedAt: nowText(),
+  }
+}
+
+function bumpVulnerabilityDataset(dataset: VulnerabilityDataset): VulnerabilityDataset {
+  return {
+    ...dataset,
+    vulnerabilityCount: dataset.vulnerabilityCount + 1,
+    cveUnlinkedCount: dataset.cveUnlinkedCount + 1,
+    recordCount: dataset.recordCount + 1,
+    weeklyAdded: dataset.weeklyAdded + 1,
+    updatedAt: nowText(),
+  }
+}
+
 export function DataCenterProvider({ children }: { children: ReactNode }) {
   const [state, setState] = useState<DataCenterState>(readState)
 
@@ -195,24 +278,39 @@ export function DataCenterProvider({ children }: { children: ReactNode }) {
     window.localStorage.setItem(DATA_CENTER_KEY, JSON.stringify(state))
   }, [state])
 
-  const updateDataDispositionStatus = useCallback((runId: string, status: DataDispositionStatus) => {
+  const updateDataDispositionStatus = useCallback((
+    runId: string,
+    status: DataDispositionStatus,
+    dataset?: { id: string; name: string },
+  ) => {
     setState((current) => ({
       ...current,
       results: current.results.map((result) =>
-        result.runId === runId ? { ...result, dataDispositionStatus: status } : result,
+        result.runId === runId
+          ? {
+              ...result,
+              dataDispositionStatus: status,
+              dispositionDatasetId: dataset?.id ?? result.dispositionDatasetId,
+              dispositionDatasetName: dataset?.name ?? result.dispositionDatasetName,
+            }
+          : result,
       ),
     }))
   }, [])
 
   const generateResult = useCallback((run: RangeRun) => {
-    const result = resultFromRun(run)
-    setState((current) => ({
-      ...current,
-      results: current.results.some((item) => item.runId === run.id)
-        ? current.results.map((item) => (item.runId === run.id ? result : item))
-        : [result, ...current.results],
-    }))
-    return result
+    let output: EvaluationResult
+    setState((current) => {
+      const existing = current.results.find((item) => item.runId === run.id)
+      output = resultFromRun(run, existing)
+      return {
+        ...current,
+        results: existing
+          ? current.results.map((item) => (item.runId === run.id ? output : item))
+          : [output, ...current.results],
+      }
+    })
+    return output!
   }, [])
 
   const generateCptCandidates = useCallback((runId: string) => {
@@ -233,7 +331,13 @@ export function DataCenterProvider({ children }: { children: ReactNode }) {
         tags: ['range-run', 'cpt-candidate'],
       },
     ]
-    setState((current) => ({ ...current, cptCorpus: [...items, ...current.cptCorpus] }))
+    setState((current) => ({
+      ...current,
+      cptCorpus: [...items, ...current.cptCorpus],
+      cptDatasets: current.cptDatasets.map((dataset) =>
+        dataset.id === 'cpt-range-summary-001' ? bumpCptDataset(dataset) : dataset,
+      ),
+    }))
     return items
   }, [])
 
@@ -261,6 +365,11 @@ export function DataCenterProvider({ children }: { children: ReactNode }) {
     setState((current) => ({
       ...current,
       vulnerabilityRecords: [record, ...current.vulnerabilityRecords],
+      vulnerabilityDatasets: current.vulnerabilityDatasets.map((dataset) =>
+        dataset.id === 'vds-rangerun-001' || dataset.id === 'vds-master-001'
+          ? bumpVulnerabilityDataset(dataset)
+          : dataset,
+      ),
     }))
     return record
   }, [])
@@ -271,7 +380,7 @@ export function DataCenterProvider({ children }: { children: ReactNode }) {
       name: input.datasetName || `Run ${input.runId} 轨迹数据集`,
       description: input.datasetDescription || '由运行数据处理流程创建的 Mock 轨迹数据集。',
       taskType: '自动沉淀',
-      source: 'RangeRun',
+      source: '场景演练',
       agentType: 'Mixed Agent',
       usage: '训练候选 / 评测回放',
       tags: ['auto-disposition', input.runId],
@@ -290,7 +399,7 @@ export function DataCenterProvider({ children }: { children: ReactNode }) {
       trajectoryDatasets: [dataset, ...current.trajectoryDatasets],
       traces: [...traces, ...current.traces],
     }))
-    updateDataDispositionStatus(input.runId, 'created_dataset')
+    updateDataDispositionStatus(input.runId, 'created_dataset', dataset)
     return dataset
   }, [updateDataDispositionStatus])
 
@@ -314,7 +423,7 @@ export function DataCenterProvider({ children }: { children: ReactNode }) {
       }),
       traces: [...traces, ...current.traces],
     }))
-    updateDataDispositionStatus(input.runId, 'appended_dataset')
+    if (target) updateDataDispositionStatus(input.runId, 'appended_dataset', target)
     return target
   }, [updateDataDispositionStatus])
 
@@ -365,7 +474,7 @@ export function DataCenterProvider({ children }: { children: ReactNode }) {
           : appendToTrajectoryDataset(input)
       generateCptCandidates(input.runId)
       createVulnerabilityRecord(input.runId)
-      return { datasetId: dataset?.id }
+      return { datasetId: dataset?.id, datasetName: dataset?.name }
     },
     [
       appendToTrajectoryDataset,
@@ -404,32 +513,6 @@ export function DataCenterProvider({ children }: { children: ReactNode }) {
   )
 
   return <DataCenterContext.Provider value={value}>{children}</DataCenterContext.Provider>
-}
-
-function makeTracesForDataset(datasetId: string, runId: string): TraceRecord[] {
-  return Array.from({ length: 8 }, (_, index) => ({
-    id: uniqueId('trace'),
-    datasetId,
-    runId,
-    task: `Run ${runId} 沉淀轨迹`,
-    agent: 'Mock Agent',
-    model: 'Mock InternLM',
-    verdict: index % 4 === 0 ? 'Partial' : 'Success',
-    steps: 10 + index,
-    token: 90000 + index * 5000,
-    cost: 18 + index,
-    quality: index % 3 === 0 ? '高' : '中高',
-    createdAt: nowText(),
-    observation: 'Observation 摘要：环境状态已记录。',
-    planningSummary: '结构化规划摘要：分解目标、执行工具、验证结果。',
-    action: '执行受控工具调用。',
-    toolCall: 'tool.run({ name: "mock_tool" })',
-    toolResult: '工具返回已脱敏结构化结果。',
-    feedback: 'Verifier 标记该回合可用于训练候选。',
-    finalResult: '完成',
-    score: 78 + index,
-    evidenceRef: uniqueId('SNAP'),
-  }))
 }
 
 export function useDataCenter() {
