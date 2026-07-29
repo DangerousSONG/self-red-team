@@ -118,7 +118,7 @@ function ResultRow({
             <Database className="h-3.5 w-3.5" />
             处理数据
           </Button>
-          <Button size="sm" variant="ghost" onClick={() => onNavigate('home')}>
+          <Button size="sm" variant="ghost" onClick={() => onNavigate('rangerun')}>
             返回运行
           </Button>
         </div>

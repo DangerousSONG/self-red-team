@@ -11,6 +11,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { DashboardPage } from '@/pages/DashboardPage'
+import { RunOverviewPage } from '@/pages/RunOverviewPage'
 import { TasksPage } from '@/pages/TasksPage'
 import { ResultsPage } from '@/pages/ResultsPage'
 import { ResultDetailPage } from '@/pages/ResultDetailPage'
@@ -75,7 +76,11 @@ export default function App() {
   }
 
   const renderPage = () => {
-    if (activeId === 'home' || activeId === 'rangerun') {
+    if (activeId === 'home') {
+      return <RunOverviewPage onNavigate={handleNavigate} onOpenResult={openResult} />
+    }
+
+    if (activeId === 'rangerun') {
       return (
         <>
           <Header onNavigate={handleNavigate} onOpenResult={openResult} />

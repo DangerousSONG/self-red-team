@@ -57,21 +57,15 @@ export function TaskListTable({ onEdit, onViewRun }: TaskListTableProps) {
                 <tr key={task.id} className="border-t border-[var(--color-border)]">
                   <td className="px-3 py-3">
                     <div className="font-semibold text-[var(--color-ink)]">{task.name}</div>
-                    <div className="mt-0.5 max-w-[260px] truncate text-xs text-[var(--color-ink-muted)]">
-                      {task.objective}
-                    </div>
+                    <div className="mt-0.5 max-w-[260px] truncate text-xs text-[var(--color-ink-muted)]">{task.objective}</div>
                   </td>
                   <td className="px-3 py-3 text-[var(--color-ink-secondary)]">{task.type}</td>
-                  <td className="px-3 py-3 font-mono text-xs text-[var(--color-ink-secondary)]">
-                    {task.environment}
-                  </td>
+                  <td className="px-3 py-3 font-mono text-xs text-[var(--color-ink-secondary)]">{task.environment}</td>
                   <td className="px-3 py-3 text-[var(--color-ink-secondary)]">{task.agent}</td>
                   <td className="px-3 py-3">
                     <Badge variant={statusVariant[task.status]}>{statusLabel[task.status]}</Badge>
                   </td>
-                  <td className="px-3 py-3 font-mono text-xs text-[var(--color-ink-muted)]">
-                    {task.createdAt}
-                  </td>
+                  <td className="px-3 py-3 font-mono text-xs text-[var(--color-ink-muted)]">{task.createdAt}</td>
                   <td className="px-3 py-3">
                     <div className="flex flex-wrap gap-1.5">
                       <Button size="sm" variant="ghost" onClick={() => onEdit(task)}>

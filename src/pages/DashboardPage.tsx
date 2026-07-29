@@ -26,9 +26,7 @@ export function DashboardPage({ onNavigate }: DashboardPageProps) {
               <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-lg bg-[var(--color-brand-soft)] text-[var(--color-brand)]">
                 <FilePlus2 className="h-6 w-6" />
               </div>
-              <h2 className="text-xl font-semibold text-[var(--color-ink)]">
-                暂无正在运行的演练
-              </h2>
+              <h2 className="text-xl font-semibold text-[var(--color-ink)]">暂无正在运行的演练</h2>
               <p className="mt-2 max-w-md text-sm leading-6 text-[var(--color-ink-secondary)]">
                 请先进入评测任务中心，选择任务、匹配资源并确认启动一条 Mock RangeRun。
               </p>
