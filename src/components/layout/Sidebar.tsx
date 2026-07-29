@@ -1,12 +1,15 @@
 import { useState } from 'react'
-import { BarChart3, Brain, Database, FileText, LayoutDashboard, Network, PlayCircle, type LucideIcon } from 'lucide-react'
+import { BarChart3, Brain, Database, FileText, LayoutDashboard, Network, type LucideIcon } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useRangeTasks } from '@/hooks/useRangeTasks'
+import { useDataCenter } from '@/hooks/useDataCenter'
+import { usePlatformFocus } from '@/hooks/usePlatformFocus'
+import { isActivePlatformTask, platformTasksFrom } from '@/lib/platform-tasks'
+import type { PlatformTaskSummary } from '@/types/platform'
 
 const stageNavItems = [
   { id: 'home', label: '运行总览', icon: 'LayoutDashboard' },
   { id: 'tasks', label: '评测任务', icon: 'FileText' },
-  { id: 'rangerun', label: 'RangeRun', icon: 'PlayCircle' },
   { id: 'results', label: '评分结果', icon: 'BarChart3' },
   { id: 'data-center', label: '数据中心', icon: 'Database' },
   { id: 'training', label: '基模训练', icon: 'Brain' },
@@ -15,7 +18,6 @@ const stageNavItems = [
 const iconMap: Record<string, LucideIcon> = {
   LayoutDashboard,
   FileText,
-  PlayCircle,
   BarChart3,
   Database,
   Brain,
@@ -24,13 +26,21 @@ const iconMap: Record<string, LucideIcon> = {
 interface SidebarProps {
   activeId: string
   onNavigate: (id: string) => void
+  onOpenRun: (runId: string) => void
+  onOpenTrainingJob: (jobId: string) => void
 }
 
-export function Sidebar({ activeId, onNavigate }: SidebarProps) {
-  const { currentRun, draftProgress, runSummaries, focusedRunId, setFocusedRun } = useRangeTasks()
+export function Sidebar({ activeId, onNavigate, onOpenRun, onOpenTrainingJob }: SidebarProps) {
+  const { draftProgress, runSummaries, setFocusedRun } = useRangeTasks()
+  const { trainingJobs } = useDataCenter()
+  const { focus, focusTask } = usePlatformFocus()
   const [switcherOpen, setSwitcherOpen] = useState(false)
-  const focusedRun = runSummaries.find((run) => run.id === focusedRunId) ?? runSummaries.find((run) => run.status === 'running') ?? null
-  const switchableRuns = runSummaries.filter((run) => !['completed', 'stopped'].includes(run.status))
+  const platformTasks = platformTasksFrom({ runs: runSummaries, trainingJobs })
+  const activeTasks = platformTasks.filter(isActivePlatformTask)
+  const focusedTask =
+    (focus ? platformTasks.find((task) => task.id === focus.id && task.type === focus.type) : undefined) ??
+    activeTasks[0] ??
+    platformTasks[0]
 
   const activeGroup = activeId.startsWith('result') || activeId === 'run-data'
     ? 'results'
@@ -38,7 +48,20 @@ export function Sidebar({ activeId, onNavigate }: SidebarProps) {
       ? 'data-center'
       : activeId.startsWith('training') || activeId.startsWith('artifact')
         ? 'training'
+      : activeId === 'run-detail' || activeId === 'rangerun'
+        ? 'home'
       : activeId
+
+  const openFocusedTask = (task?: PlatformTaskSummary) => {
+    if (!task) return
+    focusTask(task.id, task.type)
+    if (task.runId) {
+      setFocusedRun(task.runId)
+      onOpenRun(task.runId)
+      return
+    }
+    if (task.trainingJobId) onOpenTrainingJob(task.trainingJobId)
+  }
 
   return (
     <aside className="flex h-screen w-[220px] shrink-0 flex-col bg-[#0f2744] text-white">
@@ -87,24 +110,22 @@ export function Sidebar({ activeId, onNavigate }: SidebarProps) {
           <div className="font-mono text-[10px] uppercase tracking-[0.14em] text-white/45">
             当前关注
           </div>
-          {focusedRun || currentRun ? (
+          {focusedTask ? (
             <>
               <div className="mt-1.5 text-[12px] font-medium leading-snug text-white">
-                {focusedRun?.taskName ?? currentRun?.taskName}
+                {focusedTask.name}
               </div>
-              <div className="mt-2 flex items-center gap-1.5 text-[11px] text-emerald-300">
-                <span className={cn('h-1.5 w-1.5 rounded-full bg-emerald-400', (focusedRun?.status === 'running' || currentRun?.status === 'Running') && 'status-pulse')} />
-                {focusedRun ? `${statusText(focusedRun.status)} / ${focusedRun.currentStage}` : `RangeRun / ${currentRun?.status}`}
+              <div className={cn('mt-2 flex items-center gap-1.5 text-[11px]', focusedTask.status === 'failed' ? 'text-rose-300' : focusedTask.status === 'queued' ? 'text-slate-300' : 'text-emerald-300')}>
+                <span className={cn('h-1.5 w-1.5 rounded-full', focusedTask.status === 'failed' ? 'bg-rose-400' : focusedTask.status === 'queued' ? 'bg-slate-400' : 'bg-emerald-400', focusedTask.status === 'running' && 'status-pulse')} />
+                {typeText(focusedTask.type)} / {statusText(focusedTask.status)}
               </div>
-              <div className="mt-1 font-mono text-[10px] text-white/40">{focusedRun?.id ?? currentRun?.id}</div>
+              <div className="mt-1 truncate text-[10px] text-white/45">{focusedTask.currentStage}</div>
+              <div className="mt-1 font-mono text-[10px] text-white/40">{focusedTask.runId ?? focusedTask.trainingJobId}</div>
               <div className="mt-2 flex items-center gap-2">
                 <button
                   type="button"
                   className="rounded-md bg-white/10 px-2 py-1 text-[11px] text-white/80 hover:bg-white/15"
-                  onClick={() => {
-                    if (focusedRun) setFocusedRun(focusedRun.id)
-                    onNavigate('rangerun')
-                  }}
+                  onClick={() => openFocusedTask(focusedTask)}
                 >
                   进入
                 </button>
@@ -122,23 +143,27 @@ export function Sidebar({ activeId, onNavigate }: SidebarProps) {
           )}
           {switcherOpen ? (
             <div className="absolute bottom-full left-0 z-30 mb-2 max-h-[320px] w-[300px] overflow-y-auto rounded-xl border border-white/10 bg-[#102b4a] p-2 shadow-xl">
-              {switchableRuns.map((run) => (
+              {activeTasks.map((task) => (
                 <button
-                  key={run.id}
+                  key={`${task.type}-${task.id}`}
                   type="button"
                   className="w-full rounded-lg px-2.5 py-2 text-left hover:bg-white/10"
                   onClick={() => {
-                    setFocusedRun(run.id)
+                    focusTask(task.id, task.type)
+                    if (task.runId) setFocusedRun(task.runId)
                     setSwitcherOpen(false)
                   }}
                 >
-                  <div className="line-clamp-1 text-[12px] font-medium text-white">{run.taskName}</div>
+                  <div className="line-clamp-1 text-[12px] font-medium text-white">{task.name}</div>
                   <div className="mt-1 flex items-center justify-between gap-2 text-[10px] text-white/55">
-                    <span>{statusText(run.status)}</span>
-                    <span>{run.progress}%</span>
+                    <span>{typeText(task.type)} / {statusText(task.status)}</span>
+                    <span>{task.progress}%</span>
                   </div>
                 </button>
               ))}
+              {activeTasks.length === 0 ? (
+                <div className="px-2.5 py-3 text-[12px] text-white/60">暂无活跃任务</div>
+              ) : null}
             </div>
           ) : null}
         </div>
@@ -173,4 +198,12 @@ function statusText(status: string) {
     failed: 'Failed',
     stopped: 'Stopped',
   }[status] ?? status
+}
+
+function typeText(type: PlatformTaskSummary['type']) {
+  return {
+    scenario_run: '场景演练',
+    benchmark_run: '基准评测',
+    base_model_training: '基模训练',
+  }[type]
 }

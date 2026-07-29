@@ -4,9 +4,13 @@
 
 ## 本阶段新增
 
-- 运行总览主页升级为多任务运行态势总览，可同时查看运行中、排队中、评测中和异常任务。
-- 首页新增并发与资源态势，展示当前并发额度、CPU、内存、VM、Docker 容器、Token 和成本概况。
-- 首页支持卡片视图与紧凑列表、任务搜索、分类筛选和当前关注任务切换。
+- 左侧一级导航调整为：运行总览、评测任务、评分结果、数据中心、基模训练。
+- RangeRun 不再作为一级菜单出现，改为具体运行实例详情页，通过 `/runs/:runId` 语义入口访问。
+- 运行总览升级为平台入口页，提供场景演练、基准评测和基模训练三个快速开始入口。
+- 首页“平台任务态势”统一展示场景演练、基准评测和基模训练任务，并可进入对应实例详情。
+- 左下角“当前关注”支持在运行实例和训练任务之间切换，刷新后通过 localStorage 保留。
+- 最近评测结果支持查看报告、返回来源运行和跳转沉淀数据集。
+- 首页新增“最近数据与模型产物”，覆盖轨迹数据集、CPT 语料集、漏洞数据集、Benchmark 数据集和基模产物。
 - 数据中心从三类资产扩展为四类：轨迹数据集、CPT 语料库、漏洞数据、Benchmark 数据集。
 - 新增 Benchmark 数据集列表和详情门户，覆盖 CyberGym、ExploitGym、PatchEval 和自研综合评测集。
 - CPT 语料库和漏洞数据支持“训练选择模式”，可勾选数据集并发起基模训练。
@@ -20,13 +24,13 @@
 ### 多任务运行总览
 
 1. 进入“运行总览”。
-2. 查看顶部统计卡，确认任务总数、运行中、排队中、评测中、已完成、异常任务和当前并发。
-3. 在“运行中任务”看板中查看每个 RangeRun 的阶段、进度、Agent、环境、Token 和成本预算。
-4. 使用“全部 / 场景演练 / 基准评测 / 运行中 / 排队中 / 评测中 / 异常”筛选任务。
-5. 通过搜索框按任务名称或 Run ID 查找任务。
-6. 点击星标或“查看 CasePlan”将任务设为当前关注。
-7. 点击“进入控制台”进入对应 RangeRun 控制台。
-8. 在左下角“当前关注”卡片中点击“切换”，可快速切换关注任务。
+2. 通过顶部“创建评测任务”进入评测任务中心。
+3. 使用“快速开始”中的“创建场景演练”或“创建基准评测”，会默认打开对应任务分类 Tab。
+4. 使用“创建训练任务”进入基模训练模块。
+5. 在“平台任务态势”中查看场景演练、基准评测和基模训练的阶段、进度、状态和数据来源。
+6. 点击场景演练或基准评测卡片进入对应 `/runs/:runId` 运行控制台。
+7. 点击基模训练卡片进入对应 `/training/:jobId` 训练详情页。
+8. 在左下角“当前关注”卡片中点击“切换”，可快速切换关注任务或训练任务。
 
 ### 数据沉淀与训练
 
@@ -46,6 +50,7 @@
 
 当前项目使用轻量前端状态模拟页面路由，对应页面包括：
 
+- `/runs/:runId`
 - `/results`
 - `/results/:runId`
 - `/results/:runId/data`
@@ -72,13 +77,24 @@
 
 ## 运行总览多任务逻辑
 
-主页使用 `RangeRunSummary[]` 展示多任务态势，类型定义在 `src/types/range.ts`。
+主页使用 `PlatformTaskSummary[]` 展示平台任务态势，类型定义在 `src/types/platform.ts`。
+
+`PlatformTaskSummary` 由两类来源统一映射生成：
+
+- `RangeRunSummary[]`：场景演练和基准评测运行实例。
+- `TrainingJob[]`：基模训练任务。
+
+任务类型：
+
+- `scenario_run`：场景演练
+- `benchmark_run`：基准评测
+- `base_model_training`：基模训练
 
 状态映射：
 
 - `queued`：排队中
 - `preparing` / `provisioning` / `self_check` / `running`：运行中
-- `evidence_sealing` / `destroying` / `scoring` / `evaluating`：评测中
+- `evidence_sealing` / `destroying` / `scoring` / `evaluating`：评分或评测中
 - `completed`：已完成
 - `failed` / `stopped`：异常任务
 
@@ -90,16 +106,20 @@
 4. Scoring / Evaluating
 5. Queued
 
-点击任务卡片的“进入控制台”时，会将该任务映射为现有 `currentRun` 并跳转到 RangeRun 控制台。RangeRun 控制台核心布局保持不变。
+点击场景演练或基准评测任务卡片时，会将该任务映射为现有 `currentRun` 并进入 `/runs/:runId`。RangeRun 控制台核心布局保持不变。
 
-并发与资源统计：
-
-- 当前并发：运行中与评测中任务的 `concurrency` 汇总。
-- 最大并发：Mock 固定为 10。
-- CPU / 内存 / VM / Docker 容器：按运行中和评测中任务的资源字段汇总。
-- Failed、Stopped、Completed 不占用当前并发额度。
+点击基模训练任务卡片时，会进入 `/training/:jobId`。
 
 Mock 任务每隔数秒轻量推进一次进度、耗时、Token 和成本，数据保存在 localStorage，刷新后保留。
+
+## 当前关注任务
+
+当前关注任务由 `src/hooks/usePlatformFocus.ts` 管理，保存在 `self-red-team.platform-focus.v1`。
+
+- 如果用户关注的是场景演练或基准评测，左下角“进入”打开 `/runs/:runId`。
+- 如果用户关注的是基模训练，左下角“进入”打开 `/training/:jobId`。
+- 侧栏“切换”只展示活跃任务，不在侧栏堆叠所有任务。
+- 结果页返回来源运行时，如果该 Run 只存在于历史报告中，会生成一个只读 Mock 运行实例用于回溯。
 
 ## Benchmark 数据集
 

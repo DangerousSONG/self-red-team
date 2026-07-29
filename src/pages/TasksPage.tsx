@@ -25,6 +25,9 @@ import type { RunConfig, Task, TaskCategory } from '@/types/range'
 interface TasksPageProps {
   onNavigate: (id: string) => void
   onDirtyChange?: (dirty: boolean) => void
+  onOpenRun?: (runId: string) => void
+  defaultCategory?: TaskCategory
+  onConsumedDefaultCategory?: () => void
 }
 
 type TaskTab = 'create' | 'list'
@@ -32,7 +35,7 @@ type SaveState = 'saving' | 'saved' | 'failed'
 
 const startupStages = ['封存 CasePlan', '校验资源', '创建 RangeRun', '正在跳转运行控制台']
 
-export function TasksPage({ onNavigate, onDirtyChange }: TasksPageProps) {
+export function TasksPage({ onNavigate, onDirtyChange, onOpenRun, defaultCategory, onConsumedDefaultCategory }: TasksPageProps) {
   const {
     draftProgress,
     setDraftProgress,
@@ -82,6 +85,14 @@ export function TasksPage({ onNavigate, onDirtyChange }: TasksPageProps) {
       setStep(0)
     }
   }, [selectedTemplateId])
+
+  useEffect(() => {
+    if (!defaultCategory) return
+    setActiveTab('create')
+    setTaskCategoryTab(defaultCategory)
+    setStep(0)
+    onConsumedDefaultCategory?.()
+  }, [defaultCategory, onConsumedDefaultCategory])
 
   useEffect(() => {
     if (step > maxReachableStep) setStep(maxReachableStep)
@@ -172,10 +183,11 @@ export function TasksPage({ onNavigate, onDirtyChange }: TasksPageProps) {
       setStartupStage(stage)
       await new Promise((resolve) => window.setTimeout(resolve, 450))
     }
-    await startRun(input)
+    const run = await startRun(input)
     setStarting(false)
     setDirty(false)
-    onNavigate('home')
+    if (onOpenRun) onOpenRun(run.id)
+    else onNavigate('home')
   }
 
   const handleEdit = (task: Task) => {
@@ -343,7 +355,7 @@ export function TasksPage({ onNavigate, onDirtyChange }: TasksPageProps) {
             />
           </div>
         ) : (
-          <TaskListTable onEdit={handleEdit} onViewRun={() => onNavigate('home')} />
+          <TaskListTable onEdit={handleEdit} onViewRun={(runId) => runId && onOpenRun ? onOpenRun(runId) : onNavigate('home')} />
         )}
       </div>
 

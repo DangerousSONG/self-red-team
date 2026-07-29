@@ -34,7 +34,6 @@ export const navItems = [
   { id: 'models', label: '模型管理', icon: 'Cpu' },
   { id: 'caseplan', label: 'CasePlan', icon: 'FileText' },
   { id: 'orchestration', label: '运行编排', icon: 'Workflow' },
-  { id: 'rangerun', label: 'RangeRun', icon: 'PlayCircle' },
   { id: 'resources', label: '资源管理', icon: 'Server' },
   { id: 'topology', label: '网络拓扑', icon: 'Network' },
   { id: 'evidence', label: '证据中心', icon: 'ShieldCheck' },

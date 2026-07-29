@@ -29,18 +29,26 @@ import { TrainingJobsPage } from '@/pages/TrainingJobsPage'
 import { TrainingJobDetailPage } from '@/pages/TrainingJobDetailPage'
 import { ModelArtifactsPage } from '@/pages/ModelArtifactsPage'
 import { ModelArtifactDetailPage } from '@/pages/ModelArtifactDetailPage'
+import { usePlatformFocus } from '@/hooks/usePlatformFocus'
+import { useRangeTasks } from '@/hooks/useRangeTasks'
+import { useDataCenter } from '@/hooks/useDataCenter'
+import type { TaskCategory } from '@/types/range'
 
 export default function App() {
   const [activeId, setActiveId] = useState('home')
   const [tasksDirty, setTasksDirty] = useState(false)
   const [pendingNavId, setPendingNavId] = useState<string | null>(null)
   const [selectedRunId, setSelectedRunId] = useState('')
+  const [quickTaskCategory, setQuickTaskCategory] = useState<TaskCategory | undefined>()
   const [selectedDatasetId, setSelectedDatasetId] = useState('')
   const [selectedCorpusId, setSelectedCorpusId] = useState('')
   const [selectedVulnerabilityDatasetId, setSelectedVulnerabilityDatasetId] = useState('')
   const [selectedBenchmarkDatasetId, setSelectedBenchmarkDatasetId] = useState('')
   const [selectedTrainingJobId, setSelectedTrainingJobId] = useState('')
   const [selectedArtifactId, setSelectedArtifactId] = useState('')
+  const { setFocusedRun } = useRangeTasks()
+  const { focusTask } = usePlatformFocus()
+  const { results } = useDataCenter()
 
   const handleNavigate = (id: string) => {
     if (activeId === 'tasks' && id !== 'tasks' && tasksDirty) {
@@ -53,6 +61,29 @@ export default function App() {
   const openResult = (runId: string) => {
     setSelectedRunId(runId)
     handleNavigate('result-detail')
+  }
+
+  const openRun = (runId: string) => {
+    const result = results.find((item) => item.runId === runId)
+    const summary = setFocusedRun(runId, result
+      ? {
+          taskName: result.taskName,
+          category: result.taskCategory === '基准评测' ? 'benchmark' : 'scenario',
+          benchmark: result.benchmark,
+          status: result.verdict === 'Stopped' ? 'stopped' : 'completed',
+          progress: result.progress,
+          currentStage: result.attackStage ?? result.benchmark ?? 'Completed',
+          stageDescription: '历史运行记录，已完成评分并生成报告。',
+          environment: result.environmentKind ?? 'historical-mock-range',
+          agent: result.agent,
+          model: result.model,
+          costUsed: result.cost,
+          updatedAt: result.completedAt,
+        }
+      : undefined)
+    setSelectedRunId(runId)
+    if (summary) focusTask(summary.id, summary.category === 'benchmark' ? 'benchmark_run' : 'scenario_run')
+    handleNavigate('run-detail')
   }
 
   const processRunData = (runId: string) => {
@@ -82,7 +113,13 @@ export default function App() {
 
   const openTrainingJob = (id: string) => {
     setSelectedTrainingJobId(id)
+    focusTask(id, 'base_model_training')
     handleNavigate('training-detail')
+  }
+
+  const quickStartTask = (category: TaskCategory) => {
+    setQuickTaskCategory(category)
+    handleNavigate('tasks')
   }
 
   const openArtifact = (id: string) => {
@@ -103,9 +140,24 @@ export default function App() {
   }
 
   const renderPage = () => {
-    if (activeId === 'home') return <RunOverviewPage onNavigate={handleNavigate} onOpenResult={openResult} onOpenDataset={openDataset} />
+    if (activeId === 'home') {
+      return (
+        <RunOverviewPage
+          onNavigate={handleNavigate}
+          onOpenResult={openResult}
+          onOpenDataset={openDataset}
+          onOpenRun={openRun}
+          onOpenTrainingJob={openTrainingJob}
+          onOpenCorpus={openCorpus}
+          onOpenVulnerability={openVulnerabilityDataset}
+          onOpenBenchmark={openBenchmarkDataset}
+          onOpenArtifact={openArtifact}
+          onQuickStartTask={quickStartTask}
+        />
+      )
+    }
 
-    if (activeId === 'rangerun') {
+    if (activeId === 'run-detail' || activeId === 'rangerun') {
       return (
         <>
           <Header onNavigate={handleNavigate} onOpenResult={openResult} />
@@ -117,7 +169,13 @@ export default function App() {
     if (activeId === 'tasks') {
       return (
         <ErrorBoundary>
-          <TasksPage onNavigate={handleNavigate} onDirtyChange={setTasksDirty} />
+          <TasksPage
+            onNavigate={handleNavigate}
+            onDirtyChange={setTasksDirty}
+            onOpenRun={openRun}
+            defaultCategory={quickTaskCategory}
+            onConsumedDefaultCategory={() => setQuickTaskCategory(undefined)}
+          />
         </ErrorBoundary>
       )
     }
@@ -128,13 +186,14 @@ export default function App() {
           onOpenResult={openResult}
           onProcessData={processRunData}
           onOpenDataset={openDataset}
+          onOpenRun={openRun}
           onNavigate={handleNavigate}
         />
       )
     }
 
     if (activeId === 'result-detail') {
-      return <ResultDetailPage runId={selectedRunId} onNavigate={handleNavigate} onProcessData={processRunData} onOpenDataset={openDataset} />
+      return <ResultDetailPage runId={selectedRunId} onNavigate={handleNavigate} onOpenRun={openRun} onProcessData={processRunData} onOpenDataset={openDataset} />
     }
 
     if (activeId === 'run-data') {
@@ -161,7 +220,7 @@ export default function App() {
   return (
     <>
       <div className="flex min-h-screen">
-        <Sidebar activeId={activeId} onNavigate={handleNavigate} />
+        <Sidebar activeId={activeId} onNavigate={handleNavigate} onOpenRun={openRun} onOpenTrainingJob={openTrainingJob} />
         <div className="flex min-w-0 flex-1 flex-col">{renderPage()}</div>
       </div>
 

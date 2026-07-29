@@ -1,9 +1,11 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import {
   AlertTriangle,
+  ArrowRight,
   BarChart3,
+  Boxes,
+  Brain,
   ClipboardList,
-  Database,
   FilePlus2,
   PlayCircle,
   Search,
@@ -13,76 +15,146 @@ import {
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { cn } from '@/lib/utils'
 import { useDataCenter } from '@/hooks/useDataCenter'
+import { usePlatformFocus } from '@/hooks/usePlatformFocus'
 import { useRangeTasks } from '@/hooks/useRangeTasks'
+import { cn } from '@/lib/utils'
+import { isActivePlatformTask, platformTasksFrom } from '@/lib/platform-tasks'
 import type { DataDispositionStatus, EvaluationResult } from '@/types/data-center'
-import type { RangeRunSummary } from '@/types/range'
+import type { PlatformTaskSummary, PlatformTaskType } from '@/types/platform'
+import type { TaskCategory } from '@/types/range'
 
 interface RunOverviewPageProps {
   onNavigate: (id: string) => void
   onOpenResult: (runId: string) => void
   onOpenDataset: (datasetId: string) => void
+  onOpenRun: (runId: string) => void
+  onOpenTrainingJob: (jobId: string) => void
+  onOpenCorpus: (id: string) => void
+  onOpenVulnerability: (id: string) => void
+  onOpenBenchmark: (id: string) => void
+  onOpenArtifact: (id: string) => void
+  onQuickStartTask: (category: TaskCategory) => void
 }
 
-type FilterKey = 'all' | 'scenario' | 'benchmark' | 'running' | 'queued' | 'evaluating' | 'abnormal'
-type ViewMode = 'card' | 'list'
+type FilterKey = 'all' | PlatformTaskType | 'abnormal'
+type AssetItem = {
+  id: string
+  name: string
+  type: string
+  source: string
+  meta: string
+  createdAt: string
+  status: string
+  onOpen: () => void
+}
 
-const maxConcurrency = 10
-const runningStatuses: RangeRunSummary['status'][] = ['preparing', 'provisioning', 'self_check', 'running']
-const evaluatingStatuses: RangeRunSummary['status'][] = ['evidence_sealing', 'destroying', 'scoring', 'evaluating']
-const activeStatuses: RangeRunSummary['status'][] = [...runningStatuses, ...evaluatingStatuses]
-
-export function RunOverviewPage({ onNavigate, onOpenResult, onOpenDataset }: RunOverviewPageProps) {
+export function RunOverviewPage({
+  onNavigate,
+  onOpenResult,
+  onOpenDataset,
+  onOpenRun,
+  onOpenTrainingJob,
+  onOpenCorpus,
+  onOpenVulnerability,
+  onOpenBenchmark,
+  onOpenArtifact,
+  onQuickStartTask,
+}: RunOverviewPageProps) {
+  const { runSummaries, advanceRunSummaries, setFocusedRun } = useRangeTasks()
   const {
-    runSummaries,
-    focusedRunId,
-    setFocusedRun,
-    advanceRunSummaries,
-    stopRunSummary,
-  } = useRangeTasks()
-  const { results } = useDataCenter()
+    results,
+    trainingJobs,
+    trajectoryDatasets,
+    cptDatasets,
+    vulnerabilityDatasets,
+    benchmarkDatasets,
+    modelArtifacts,
+    advanceTrainingJob,
+  } = useDataCenter()
+  const { focus, focusTask } = usePlatformFocus()
   const [filter, setFilter] = useState<FilterKey>('all')
-  const [view, setView] = useState<ViewMode>('card')
   const [search, setSearch] = useState('')
+  const [expanded, setExpanded] = useState(false)
 
   useEffect(() => {
-    const timer = window.setInterval(advanceRunSummaries, 4200)
+    const timer = window.setInterval(() => {
+      advanceRunSummaries()
+      trainingJobs
+        .filter((job) => job.status === 'running')
+        .slice(0, 2)
+        .forEach((job) => advanceTrainingJob(job.id))
+    }, 4200)
     return () => window.clearInterval(timer)
-  }, [advanceRunSummaries])
+  }, [advanceRunSummaries, advanceTrainingJob, trainingJobs])
 
-  useEffect(() => {
-    if (!focusedRunId) {
-      const fallback = [...runSummaries]
-        .filter((run) => run.status === 'running')
-        .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))[0]
-      if (fallback) setFocusedRun(fallback.id)
-    }
-  }, [focusedRunId, runSummaries, setFocusedRun])
-
-  const stats = useMemo(() => summarize(runSummaries), [runSummaries])
-  const filteredRuns = useMemo(() => {
+  const platformTasks = useMemo(
+    () => platformTasksFrom({ runs: runSummaries, trainingJobs }),
+    [runSummaries, trainingJobs],
+  )
+  const activeTasks = platformTasks.filter(isActivePlatformTask)
+  const stats = useMemo(() => summarize(platformTasks), [platformTasks])
+  const filteredTasks = useMemo(() => {
     const keyword = search.trim().toLowerCase()
-    return sortRuns(runSummaries).filter((run) => {
-      const matchedSearch = !keyword || [run.id, run.taskName, run.benchmark ?? '', run.currentStage].join(' ').toLowerCase().includes(keyword)
+    return platformTasks.filter((task) => {
       const matchedFilter =
         filter === 'all' ||
-        (filter === 'scenario' && run.category === 'scenario') ||
-        (filter === 'benchmark' && run.category === 'benchmark') ||
-        (filter === 'running' && runningStatuses.includes(run.status)) ||
-        (filter === 'queued' && run.status === 'queued') ||
-        (filter === 'evaluating' && evaluatingStatuses.includes(run.status)) ||
-        (filter === 'abnormal' && ['failed', 'stopped'].includes(run.status))
-      return matchedSearch && matchedFilter
+        task.type === filter ||
+        (filter === 'abnormal' && ['failed', 'stopped'].includes(task.status))
+      const matchedSearch =
+        !keyword ||
+        [task.id, task.name, task.runId ?? '', task.trainingJobId ?? '', task.currentStage]
+          .join(' ')
+          .toLowerCase()
+          .includes(keyword)
+      return matchedFilter && matchedSearch
     })
-  }, [filter, runSummaries, search])
-  const visibleRuns = filteredRuns.slice(0, 6)
-  const latestResults = results.slice(0, 5)
-  const resources = useMemo(() => resourceSummary(runSummaries), [runSummaries])
+  }, [filter, platformTasks, search])
+  const visibleTasks = expanded ? filteredTasks : filteredTasks.slice(0, 6)
+  const latestAssets = useMemo(
+    () =>
+      buildLatestAssets({
+        trajectoryDatasets,
+        cptDatasets,
+        vulnerabilityDatasets,
+        benchmarkDatasets,
+        modelArtifacts,
+        onOpenDataset,
+        onOpenCorpus,
+        onOpenVulnerability,
+        onOpenBenchmark,
+        onOpenArtifact,
+      }),
+    [
+      benchmarkDatasets,
+      cptDatasets,
+      modelArtifacts,
+      onOpenArtifact,
+      onOpenBenchmark,
+      onOpenCorpus,
+      onOpenDataset,
+      onOpenVulnerability,
+      trajectoryDatasets,
+      vulnerabilityDatasets,
+    ],
+  )
 
-  const enterConsole = (run: RangeRunSummary) => {
-    setFocusedRun(run.id)
-    onNavigate('rangerun')
+  const openTask = (task: PlatformTaskSummary) => {
+    focusTask(task.id, task.type)
+    if (task.runId) {
+      setFocusedRun(task.runId)
+      onOpenRun(task.runId)
+      return
+    }
+    if (task.trainingJobId) onOpenTrainingJob(task.trainingJobId)
+  }
+
+  const handleSecondaryTopAction = () => {
+    if (activeTasks.length === 1) {
+      openTask(activeTasks[0])
+      return
+    }
+    document.getElementById('platform-task-section')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
   }
 
   return (
@@ -92,108 +164,141 @@ export function RunOverviewPage({ onNavigate, onOpenResult, onOpenDataset }: Run
           <div>
             <Badge variant="outline">
               <ShieldCheck className="h-3.5 w-3.5" />
-              Overview
+              Platform Overview
             </Badge>
             <h1 className="mt-2 text-2xl font-semibold text-[var(--color-ink)]">运行总览</h1>
             <p className="mt-1 text-sm text-[var(--color-ink-secondary)]">
-              统一查看并发任务、当前 RangeRun、评测进度与数据沉淀状态
+              统一发起场景演练、基准评测和基模训练，查看平台任务与数据产出
             </p>
           </div>
-          <div className="flex gap-2">
-            <Button variant="secondary" onClick={() => onNavigate('tasks')}>
+          <div className="flex flex-wrap gap-2">
+            <Button onClick={() => onNavigate('tasks')}>
               <FilePlus2 className="h-4 w-4" />
               创建评测任务
             </Button>
-            <Button onClick={() => {
-              const focused = runSummaries.find((run) => run.id === focusedRunId) ?? visibleRuns[0]
-              if (focused) enterConsole(focused)
-              else onNavigate('rangerun')
-            }}>
-              <PlayCircle className="h-4 w-4" />
-              进入 RangeRun
-            </Button>
+            {activeTasks.length ? (
+              <Button variant="secondary" onClick={handleSecondaryTopAction}>
+                <PlayCircle className="h-4 w-4" />
+                {activeTasks.length === 1 ? '进入当前运行' : '查看全部运行'}
+              </Button>
+            ) : null}
           </div>
         </div>
 
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4 2xl:grid-cols-7">
-          <Stat label="任务总数" value={String(stats.total)} icon={<ClipboardList className="h-4 w-4" />} />
-          <Stat label="运行中" value={String(stats.running)} tone="success" icon={<PlayCircle className="h-4 w-4" />} />
-          <Stat label="排队中" value={String(stats.queued)} tone="muted" icon={<ClipboardList className="h-4 w-4" />} />
-          <Stat label="评测中" value={String(stats.evaluating)} tone="warning" icon={<BarChart3 className="h-4 w-4" />} />
-          <Stat label="已完成" value={String(stats.completed)} tone="success" icon={<ShieldCheck className="h-4 w-4" />} />
-          <Stat label="异常任务" value={String(stats.abnormal)} tone="danger" icon={<AlertTriangle className="h-4 w-4" />} />
-          <Stat label="当前并发" value={`${stats.concurrency} / ${maxConcurrency}`} icon={<Database className="h-4 w-4" />} />
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-7">
+          <Stat label="平台任务" value={stats.total} icon={<ClipboardList className="h-4 w-4" />} />
+          <Stat label="活跃任务" value={stats.active} tone="success" icon={<PlayCircle className="h-4 w-4" />} />
+          <Stat label="场景演练" value={stats.scenario} icon={<ShieldCheck className="h-4 w-4" />} />
+          <Stat label="基准评测" value={stats.benchmark} tone="purple" icon={<BarChart3 className="h-4 w-4" />} />
+          <Stat label="基模训练" value={stats.training} tone="cyan" icon={<Brain className="h-4 w-4" />} />
+          <Stat label="已完成" value={stats.completed} tone="success" icon={<Boxes className="h-4 w-4" />} />
+          <Stat label="异常任务" value={stats.abnormal} tone="danger" icon={<AlertTriangle className="h-4 w-4" />} />
         </div>
 
-        <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_360px]">
-          <section className="min-w-0 space-y-4">
-            <Card>
-              <CardHeader>
-                <div className="flex flex-wrap items-center justify-between gap-3">
-                  <CardTitle>运行中任务</CardTitle>
-                  <div className="flex flex-wrap items-center gap-2">
-                    <div className="relative">
-                      <Search className="pointer-events-none absolute left-2.5 top-2.5 h-4 w-4 text-[var(--color-ink-muted)]" />
-                      <input
-                        className="h-9 w-[240px] rounded-md border border-[var(--color-border-strong)] bg-white pl-8 pr-3 text-sm"
-                        placeholder="搜索任务名称或 Run ID"
-                        value={search}
-                        onChange={(event) => setSearch(event.target.value)}
-                      />
-                    </div>
-                    <div className="flex rounded-lg border border-[var(--color-border)] bg-white p-1">
-                      <SmallToggle active={view === 'card'} onClick={() => setView('card')}>卡片视图</SmallToggle>
-                      <SmallToggle active={view === 'list'} onClick={() => setView('list')}>紧凑列表</SmallToggle>
-                    </div>
-                  </div>
-                </div>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                <div className="flex flex-wrap gap-2">
-                  {filterOptions.map((item) => (
-                    <button
-                      key={item.key}
-                      className={cn('rounded-full border px-3 py-1.5 text-xs font-medium', filter === item.key ? 'border-[var(--color-brand)] bg-[var(--color-brand-soft)] text-[var(--color-brand)]' : 'border-[var(--color-border)] bg-white text-[var(--color-ink-secondary)]')}
-                      onClick={() => setFilter(item.key)}
-                    >
-                      {item.label}
-                    </button>
-                  ))}
-                </div>
+        <section className="space-y-3">
+          <h2 className="text-lg font-semibold">快速开始</h2>
+          <div className="grid gap-4 xl:grid-cols-3">
+            <QuickStartCard
+              icon={<ShieldCheck className="h-5 w-5" />}
+              title="发起场景演练"
+              description="在多节点靶场中验证 Agent 的长程攻击、横向移动与目标达成能力。"
+              button="创建场景演练"
+              onClick={() => onQuickStartTask('scenario')}
+            />
+            <QuickStartCard
+              icon={<BarChart3 className="h-5 w-5" />}
+              title="发起基准评测"
+              description="使用 CyberGym、ExploitGym、PatchEval 评测漏洞挖掘、利用与修复能力。"
+              button="创建基准评测"
+              tone="purple"
+              onClick={() => onQuickStartTask('benchmark')}
+            />
+            <QuickStartCard
+              icon={<Brain className="h-5 w-5" />}
+              title="使用数据训练基模"
+              description="选择 CPT 语料与漏洞数据，创建安全领域基模训练任务。"
+              button="创建训练任务"
+              tone="cyan"
+              onClick={() => onNavigate('training')}
+            />
+          </div>
+        </section>
 
-                {filteredRuns.length === 0 ? (
-                  <div className="rounded-lg border border-dashed border-[var(--color-border-strong)] bg-[var(--color-surface-muted)] p-8 text-center text-sm text-[var(--color-ink-secondary)]">
-                    没有匹配的运行任务
-                  </div>
-                ) : view === 'card' ? (
-                  <div className="grid gap-4 lg:grid-cols-2 2xl:grid-cols-3">
-                    {visibleRuns.map((run) => (
-                      <RunCard
-                        key={run.id}
-                        run={run}
-                        focused={run.id === focusedRunId}
-                        onFocus={() => setFocusedRun(run.id)}
-                        onEnter={() => enterConsole(run)}
-                        onStop={() => stopRunSummary(run.id)}
-                        onOpenResult={onOpenResult}
-                      />
-                    ))}
-                  </div>
-                ) : (
-                  <CompactRunList runs={filteredRuns} focusedRunId={focusedRunId} onFocus={setFocusedRun} onEnter={enterConsole} onStop={stopRunSummary} />
+        <section id="platform-task-section" className="space-y-3 scroll-mt-5">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <h2 className="text-lg font-semibold">平台任务态势</h2>
+              <p className="mt-1 text-sm text-[var(--color-ink-secondary)]">从这里进入具体 RangeRun 或基模训练实例。</p>
+            </div>
+            <div className="relative">
+              <Search className="pointer-events-none absolute left-2.5 top-2.5 h-4 w-4 text-[var(--color-ink-muted)]" />
+              <input
+                className="h-9 w-[260px] rounded-md border border-[var(--color-border-strong)] bg-white pl-8 pr-3 text-sm"
+                placeholder="搜索任务名称、Run ID 或 Training ID"
+                value={search}
+                onChange={(event) => setSearch(event.target.value)}
+              />
+            </div>
+          </div>
+
+          <div className="flex flex-wrap gap-2">
+            {filterOptions.map((item) => (
+              <button
+                key={item.key}
+                type="button"
+                className={cn(
+                  'rounded-full border px-3 py-1.5 text-xs font-medium',
+                  filter === item.key
+                    ? 'border-[var(--color-brand)] bg-[var(--color-brand-soft)] text-[var(--color-brand)]'
+                    : 'border-[var(--color-border)] bg-white text-[var(--color-ink-secondary)] hover:border-[var(--color-brand)]/40',
                 )}
+                onClick={() => setFilter(item.key)}
+              >
+                {item.label}
+              </button>
+            ))}
+          </div>
 
-                {filteredRuns.length > 6 && view === 'card' ? (
-                  <Button variant="secondary" onClick={() => setView('list')}>查看全部运行任务</Button>
-                ) : null}
+          {filteredTasks.length ? (
+            <div className="grid gap-4 lg:grid-cols-2 2xl:grid-cols-3">
+              {visibleTasks.map((task) => (
+                <PlatformTaskCard
+                  key={`${task.type}-${task.id}`}
+                  task={task}
+                  focused={focus?.id === task.id && focus.type === task.type}
+                  onFocus={() => {
+                    focusTask(task.id, task.type)
+                    if (task.runId) setFocusedRun(task.runId)
+                  }}
+                  onOpen={() => openTask(task)}
+                />
+              ))}
+            </div>
+          ) : (
+            <Card>
+              <CardContent className="p-8 text-center text-sm text-[var(--color-ink-secondary)]">
+                没有匹配的平台任务。
               </CardContent>
             </Card>
-          </section>
+          )}
 
-          <ResourcePanel stats={stats} resources={resources} />
+          {filteredTasks.length > 6 ? (
+            <Button variant="secondary" onClick={() => setExpanded((value) => !value)}>
+              {expanded ? '收起任务' : '查看全部任务'}
+            </Button>
+          ) : null}
+        </section>
+
+        <div className="grid gap-5 2xl:grid-cols-[1.2fr_0.8fr]">
+          <RecentResults
+            results={results.slice(0, 5)}
+            onNavigate={onNavigate}
+            onOpenResult={onOpenResult}
+            onOpenRun={onOpenRun}
+            onOpenDataset={onOpenDataset}
+          />
+          <RecentAssets assets={latestAssets} />
         </div>
-
-        <RecentResults results={latestResults} onNavigate={onNavigate} onOpenResult={onOpenResult} onOpenDataset={onOpenDataset} />
       </div>
     </main>
   )
@@ -201,173 +306,125 @@ export function RunOverviewPage({ onNavigate, onOpenResult, onOpenDataset }: Run
 
 const filterOptions: Array<{ key: FilterKey; label: string }> = [
   { key: 'all', label: '全部' },
-  { key: 'scenario', label: '场景演练' },
-  { key: 'benchmark', label: '基准评测' },
-  { key: 'running', label: '运行中' },
-  { key: 'queued', label: '排队中' },
-  { key: 'evaluating', label: '评测中' },
+  { key: 'scenario_run', label: '场景演练' },
+  { key: 'benchmark_run', label: '基准评测' },
+  { key: 'base_model_training', label: '基模训练' },
   { key: 'abnormal', label: '异常' },
 ]
 
-function RunCard({
-  run,
+function QuickStartCard({
+  icon,
+  title,
+  description,
+  button,
+  tone = 'brand',
+  onClick,
+}: {
+  icon: ReactNode
+  title: string
+  description: string
+  button: string
+  tone?: 'brand' | 'purple' | 'cyan'
+  onClick: () => void
+}) {
+  return (
+    <Card className="transition hover:-translate-y-0.5 hover:border-[var(--color-brand)]/50 hover:shadow-[var(--shadow-panel)]">
+      <CardContent className="flex h-full flex-col p-4">
+        <div className={cn('flex h-10 w-10 items-center justify-center rounded-lg', toneClass(tone, 'soft'))}>{icon}</div>
+        <h3 className="mt-3 text-base font-semibold">{title}</h3>
+        <p className="mt-2 min-h-[48px] text-sm leading-6 text-[var(--color-ink-secondary)]">{description}</p>
+        <Button className="mt-4 w-fit" variant={tone === 'brand' ? 'default' : 'secondary'} onClick={onClick}>
+          {button}
+          <ArrowRight className="h-4 w-4" />
+        </Button>
+      </CardContent>
+    </Card>
+  )
+}
+
+function PlatformTaskCard({
+  task,
   focused,
   onFocus,
-  onEnter,
-  onStop,
-  onOpenResult,
+  onOpen,
 }: {
-  run: RangeRunSummary
+  task: PlatformTaskSummary
   focused: boolean
   onFocus: () => void
-  onEnter: () => void
-  onStop: () => void
-  onOpenResult: (runId: string) => void
+  onOpen: () => void
 }) {
   return (
-    <div className={cn('group relative overflow-hidden rounded-xl border bg-white p-4 text-left shadow-[var(--shadow-card)] transition hover:-translate-y-0.5 hover:border-[var(--color-brand)]/50 hover:shadow-[var(--shadow-panel)]', focused ? 'border-[var(--color-brand)] ring-2 ring-[var(--color-brand)]/10' : 'border-[var(--color-border)]')}>
-      <div className={cn('absolute inset-y-0 left-0 w-1', statusColor(run.status))} />
-      <div className="flex items-start justify-between gap-3 pl-2">
-        <div className="min-w-0">
-          <div className="flex flex-wrap items-center gap-2">
-            <Badge variant={run.category === 'benchmark' ? 'default' : 'outline'}>{run.category === 'benchmark' ? '基准评测' : '场景演练'}</Badge>
-            {run.benchmark ? <Badge variant="muted">{run.benchmark}</Badge> : null}
-            <StatusBadge status={run.status} />
-            {focused ? <Badge variant="success"><Star className="h-3 w-3" />当前关注</Badge> : null}
+    <Card className={cn('group relative overflow-hidden transition hover:-translate-y-0.5 hover:border-[var(--color-brand)]/50 hover:shadow-[var(--shadow-panel)]', focused && 'border-[var(--color-brand)] ring-2 ring-[var(--color-brand)]/10')}>
+      <div className={cn('absolute inset-y-0 left-0 w-1', statusColor(task.status))} />
+      <CardContent className="p-4 pl-5">
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <div className="flex flex-wrap items-center gap-2">
+              <Badge variant="outline" className={typeBadgeClass(task.type)}>{typeText(task.type)}</Badge>
+              <StatusBadge status={task.status} />
+              {focused ? <Badge variant="success"><Star className="h-3 w-3" />当前关注</Badge> : null}
+            </div>
+            <h3 className="mt-2 truncate text-base font-semibold">{task.name}</h3>
+            <div className="mt-1 font-mono text-xs text-[var(--color-ink-muted)]">{task.runId ?? task.trainingJobId}</div>
           </div>
-          <h3 className="mt-2 truncate text-base font-semibold">{run.taskName}</h3>
-          <div className="mt-1 font-mono text-xs text-[var(--color-ink-muted)]">{run.id}</div>
+          <button
+            type="button"
+            className="rounded-md p-1.5 text-[var(--color-ink-muted)] hover:bg-[var(--color-brand-soft)] hover:text-[var(--color-brand)]"
+            title="设为当前关注"
+            onClick={onFocus}
+          >
+            <Star className={cn('h-4 w-4', focused && 'fill-[var(--color-brand)] text-[var(--color-brand)]')} />
+          </button>
         </div>
-        <button className="rounded-md p-1.5 text-[var(--color-ink-muted)] hover:bg-[var(--color-brand-soft)] hover:text-[var(--color-brand)]" title="设为关注" onClick={onFocus}>
-          <Star className={cn('h-4 w-4', focused && 'fill-[var(--color-brand)] text-[var(--color-brand)]')} />
-        </button>
-      </div>
 
-      <div className="mt-4 pl-2">
-        <div className="flex items-center justify-between text-sm">
-          <span className="font-semibold text-[var(--color-ink)]">{run.progress}%</span>
-          <span className="text-[var(--color-ink-muted)]">{run.currentStage}</span>
+        <div className="mt-4">
+          <div className="flex items-center justify-between text-sm">
+            <span className="font-semibold text-[var(--color-ink)]">{task.progress}%</span>
+            <span className="text-[var(--color-ink-muted)]">{task.currentStage}</span>
+          </div>
+          <ProgressBar value={task.progress} />
+          <p className="mt-2 min-h-[40px] text-xs leading-5 text-[var(--color-ink-secondary)]">
+            {task.stageDescription ?? '任务状态正在按 Mock 流程更新。'}
+          </p>
         </div>
-        <ProgressBar value={run.progress} />
-        <p className="mt-2 min-h-[40px] text-xs leading-5 text-[var(--color-ink-secondary)]">{run.stageDescription}</p>
-      </div>
 
-      <div className="mt-3 grid grid-cols-2 gap-2 pl-2 text-xs">
-        <Mini label="Agent" value={run.agent} />
-        <Mini label="模型" value={run.model} />
-        <Mini label="环境" value={run.environment} />
-        <Mini label="并发数" value={String(run.concurrency)} />
-        <Mini label="已运行" value={formatDuration(run.elapsedSeconds)} />
-        <Mini label="预计剩余" value={run.estimatedRemainingSeconds ? formatDuration(run.estimatedRemainingSeconds) : '-'} />
-        <Mini label="Token" value={`${compactNumber(run.tokenUsed)} / ${compactNumber(run.tokenBudget)}`} />
-        <Mini label="成本" value={`${run.costUsed} / ${run.costBudget} 元`} />
-      </div>
+        <div className="mt-3 grid grid-cols-2 gap-2 text-xs">
+          <Mini label={task.type === 'base_model_training' ? '基础模型' : 'Agent'} value={task.type === 'base_model_training' ? task.model ?? '-' : task.agent ?? '-'} />
+          <Mini label={task.type === 'base_model_training' ? '训练数据' : '模型'} value={task.type === 'base_model_training' ? compactList(task.datasetNames) : task.model ?? '-'} />
+          <Mini label={task.type === 'base_model_training' ? '任务类型' : '环境'} value={task.type === 'base_model_training' ? '安全领域基模训练' : task.environment ?? '-'} />
+          <Mini label="预计剩余" value={task.estimatedRemainingSeconds ? formatDuration(task.estimatedRemainingSeconds) : '-'} />
+          <Mini label="已运行" value={task.elapsedSeconds ? formatDuration(task.elapsedSeconds) : '-'} />
+          <Mini label="最近更新" value={task.updatedAt} />
+        </div>
 
-      <div className="mt-3 rounded-lg border border-[var(--color-border)] bg-[var(--color-surface-muted)] px-3 py-2 text-xs text-[var(--color-ink-secondary)]">
-        {statusInfo(run)}
-      </div>
-
-      <div className="mt-4 flex flex-wrap gap-2 pl-2">
-        <Button size="sm" onClick={onEnter}>进入控制台</Button>
-        <Button size="sm" variant="secondary" onClick={onFocus}>查看 CasePlan</Button>
-        {!['completed', 'failed', 'stopped'].includes(run.status) ? <Button size="sm" variant="ghost" onClick={onStop}>停止任务</Button> : null}
-        {run.status === 'completed' ? <Button size="sm" variant="ghost" onClick={() => onOpenResult(run.id)}>查看结果</Button> : null}
-      </div>
-    </div>
+        <div className="mt-4 flex flex-wrap gap-2">
+          <Button size="sm" onClick={onOpen}>
+            {task.type === 'base_model_training'
+              ? '查看训练'
+              : task.status === 'scoring' || task.status === 'evaluating'
+                ? '查看评测进度'
+                : '进入控制台'}
+          </Button>
+          {task.runId ? <Button size="sm" variant="secondary" onClick={onFocus}>设为关注</Button> : null}
+        </div>
+      </CardContent>
+    </Card>
   )
 }
 
-function CompactRunList({
-  runs,
-  focusedRunId,
-  onFocus,
-  onEnter,
-  onStop,
+function RecentResults({
+  results,
+  onNavigate,
+  onOpenResult,
+  onOpenRun,
+  onOpenDataset,
 }: {
-  runs: RangeRunSummary[]
-  focusedRunId: string | null
-  onFocus: (runId: string) => void
-  onEnter: (run: RangeRunSummary) => void
-  onStop: (runId: string) => void
+  results: EvaluationResult[]
+  onNavigate: (id: string) => void
+  onOpenResult: (runId: string) => void
+  onOpenRun: (runId: string) => void
+  onOpenDataset: (datasetId: string) => void
 }) {
-  return (
-    <div className="overflow-x-auto rounded-lg border border-[var(--color-border)]">
-      <table className="w-full min-w-[1080px] text-left text-sm">
-        <thead className="bg-[var(--color-surface-muted)] text-xs text-[var(--color-ink-muted)]">
-          <tr>
-            {['Run ID', '任务名称', '分类', '当前阶段', '进度', 'Agent', '环境', '已运行时间', '资源', '状态', '操作'].map((head) => <th key={head} className="px-3 py-2">{head}</th>)}
-          </tr>
-        </thead>
-        <tbody>
-          {runs.map((run) => (
-            <tr key={run.id} className={cn('border-t border-[var(--color-border)]', focusedRunId === run.id && 'bg-[var(--color-brand-soft)]')}>
-              <td className="px-3 py-3 font-mono text-xs">{run.id}</td>
-              <td className="px-3 py-3 font-semibold">{run.taskName}</td>
-              <td className="px-3 py-3">{run.category === 'benchmark' ? `基准评测 / ${run.benchmark ?? '-'}` : '场景演练'}</td>
-              <td className="px-3 py-3">{run.currentStage}</td>
-              <td className="px-3 py-3"><div className="w-28"><ProgressBar value={run.progress} /></div></td>
-              <td className="px-3 py-3">{run.agent}</td>
-              <td className="px-3 py-3">{run.environment}</td>
-              <td className="px-3 py-3">{formatDuration(run.elapsedSeconds)}</td>
-              <td className="px-3 py-3">{run.cpuCores}C / {run.memoryGb}GB</td>
-              <td className="px-3 py-3"><StatusBadge status={run.status} /></td>
-              <td className="px-3 py-3">
-                <div className="flex gap-1">
-                  <Button size="sm" variant="secondary" onClick={() => onEnter(run)}>进入</Button>
-                  <Button size="sm" variant="ghost" onClick={() => onFocus(run.id)}>关注</Button>
-                  {!['completed', 'failed', 'stopped'].includes(run.status) ? <Button size="sm" variant="ghost" onClick={() => onStop(run.id)}>停止</Button> : null}
-                </div>
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
-  )
-}
-
-function ResourcePanel({ stats, resources }: { stats: ReturnType<typeof summarize>; resources: ReturnType<typeof resourceSummary> }) {
-  const resourceTight = resources.vm.used / resources.vm.total > 0.8
-  return (
-    <aside className="space-y-4">
-      <Card>
-        <CardHeader><CardTitle>并发与资源态势</CardTitle></CardHeader>
-        <CardContent className="space-y-4">
-          <div>
-            <div className="flex items-center justify-between text-sm">
-              <span className="font-semibold">并发槽位 {stats.concurrency} / {maxConcurrency}</span>
-              <span className="text-[var(--color-ink-muted)]">可用 {Math.max(0, maxConcurrency - stats.concurrency)}</span>
-            </div>
-            <ProgressBar value={(stats.concurrency / maxConcurrency) * 100} tone="brand" />
-            <div className="mt-2 grid grid-cols-2 gap-2 text-xs">
-              <Mini label="当前并发" value={String(stats.concurrency)} />
-              <Mini label="最大并发" value={String(maxConcurrency)} />
-              <Mini label="可用并发" value={String(Math.max(0, maxConcurrency - stats.concurrency))} />
-              <Mini label="排队任务" value={String(stats.queued)} />
-            </div>
-          </div>
-
-          <ResourceBar label="CPU" used={resources.cpu.used} total={resources.cpu.total} unit="Core" />
-          <ResourceBar label="内存" used={resources.memory.used} total={resources.memory.total} unit="GB" />
-          <ResourceBar label="VM" used={resources.vm.used} total={resources.vm.total} unit="" />
-          <ResourceBar label="Docker 容器" used={resources.container.used} total={resources.container.total} unit="" />
-
-          <div className="grid grid-cols-3 gap-2 text-xs">
-            <Mini label="Token 已使用" value={compactNumber(resources.tokenUsed)} />
-            <Mini label="模型请求数" value={String(resources.modelRequests)} />
-            <Mini label="本日预估成本" value={`${resources.costUsed} 元`} />
-          </div>
-
-          <div className={cn('rounded-lg border px-3 py-2 text-sm', resourceTight ? 'border-[var(--color-warning)]/30 bg-[var(--color-warning-soft)] text-[var(--color-warning)]' : 'border-[var(--color-success)]/30 bg-[var(--color-success-soft)] text-[var(--color-success)]')}>
-            {resourceTight ? 'VM 资源使用率超过 80%，新任务可能进入排队' : '资源充足，可继续启动并行任务'}
-          </div>
-        </CardContent>
-      </Card>
-    </aside>
-  )
-}
-
-function RecentResults({ results, onNavigate, onOpenResult, onOpenDataset }: { results: EvaluationResult[]; onNavigate: (id: string) => void; onOpenResult: (runId: string) => void; onOpenDataset: (datasetId: string) => void }) {
   return (
     <Card>
       <CardHeader>
@@ -377,10 +434,10 @@ function RecentResults({ results, onNavigate, onOpenResult, onOpenDataset }: { r
         </div>
       </CardHeader>
       <CardContent className="overflow-x-auto p-0">
-        <table className="w-full min-w-[980px] text-left text-sm">
+        <table className="w-full min-w-[920px] text-left text-sm">
           <thead className="bg-[var(--color-surface-muted)] text-xs text-[var(--color-ink-muted)]">
             <tr>
-              {['Run ID', '任务名称', '分类', 'Benchmark', 'Verdict', '评分', '完成时间', '数据沉淀', '操作'].map((head) => (
+              {['Run ID', '任务名称', '分类', 'Verdict', '评分', '完成时间', '数据状态', '操作'].map((head) => (
                 <th key={head} className="px-3 py-2 font-semibold">{head}</th>
               ))}
             </tr>
@@ -391,7 +448,6 @@ function RecentResults({ results, onNavigate, onOpenResult, onOpenDataset }: { r
                 <td className="px-3 py-3 font-mono text-xs">{result.runId}</td>
                 <td className="px-3 py-3 font-semibold">{result.taskName}</td>
                 <td className="px-3 py-3">{result.taskCategory}</td>
-                <td className="px-3 py-3">{result.benchmark ?? '-'}</td>
                 <td className="px-3 py-3"><Badge variant={result.verdict === 'Success' ? 'success' : 'warning'}>{result.verdict}</Badge></td>
                 <td className="px-3 py-3 text-[var(--color-brand)]">{result.score}</td>
                 <td className="px-3 py-3">{result.completedAt}</td>
@@ -402,11 +458,50 @@ function RecentResults({ results, onNavigate, onOpenResult, onOpenDataset }: { r
                     </button>
                   ) : dispositionText(result.dataDispositionStatus)}
                 </td>
-                <td className="px-3 py-3"><Button size="sm" variant="ghost" onClick={() => onOpenResult(result.runId)}>查看报告</Button></td>
+                <td className="px-3 py-3">
+                  <div className="flex flex-wrap gap-1">
+                    <Button size="sm" variant="ghost" onClick={() => onOpenResult(result.runId)}>查看报告</Button>
+                    <Button size="sm" variant="ghost" onClick={() => onOpenRun(result.runId)}>查看来源运行</Button>
+                    {result.dispositionDatasetId ? <Button size="sm" variant="ghost" onClick={() => onOpenDataset(result.dispositionDatasetId!)}>查看数据集</Button> : null}
+                  </div>
+                </td>
               </tr>
             ))}
           </tbody>
         </table>
+      </CardContent>
+    </Card>
+  )
+}
+
+function RecentAssets({ assets }: { assets: AssetItem[] }) {
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>最近数据与模型产物</CardTitle>
+      </CardHeader>
+      <CardContent className="grid gap-3 md:grid-cols-2 2xl:grid-cols-1">
+        {assets.map((asset) => (
+          <button
+            key={`${asset.type}-${asset.id}`}
+            type="button"
+            className="rounded-lg border border-[var(--color-border)] bg-white p-3 text-left transition hover:-translate-y-0.5 hover:border-[var(--color-brand)]/50 hover:shadow-[var(--shadow-card)]"
+            onClick={asset.onOpen}
+          >
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <Badge variant="muted">{asset.type}</Badge>
+                <div className="mt-2 truncate font-semibold">{asset.name}</div>
+                <p className="mt-1 text-xs text-[var(--color-ink-muted)]">{asset.source} / {asset.meta}</p>
+              </div>
+              <ArrowRight className="mt-1 h-4 w-4 shrink-0 text-[var(--color-ink-muted)]" />
+            </div>
+            <div className="mt-2 flex items-center justify-between text-xs text-[var(--color-ink-muted)]">
+              <span>{asset.createdAt}</span>
+              <span>{asset.status}</span>
+            </div>
+          </button>
+        ))}
       </CardContent>
     </Card>
   )
@@ -419,16 +514,16 @@ function Stat({
   tone = 'brand',
 }: {
   label: string
-  value: string
+  value: number
   icon: ReactNode
-  tone?: 'brand' | 'success' | 'warning' | 'danger' | 'muted'
+  tone?: 'brand' | 'success' | 'danger' | 'purple' | 'cyan'
 }) {
   const color = {
     brand: 'text-[var(--color-brand)]',
     success: 'text-[var(--color-success)]',
-    warning: 'text-[var(--color-warning)]',
     danger: 'text-[var(--color-danger)]',
-    muted: 'text-[var(--color-ink-muted)]',
+    purple: 'text-violet-600',
+    cyan: 'text-cyan-700',
   }[tone]
   return (
     <Card>
@@ -443,14 +538,6 @@ function Stat({
   )
 }
 
-function SmallToggle({ active, onClick, children }: { active: boolean; onClick: () => void; children: ReactNode }) {
-  return (
-    <button type="button" className={cn('rounded-md px-3 py-1.5 text-sm', active ? 'bg-[var(--color-brand)] text-white' : 'text-[var(--color-ink-secondary)]')} onClick={onClick}>
-      {children}
-    </button>
-  )
-}
-
 function Mini({ label, value }: { label: string; value: string }) {
   return (
     <div className="rounded-lg border border-[var(--color-border)] bg-white px-2.5 py-2">
@@ -460,40 +547,115 @@ function Mini({ label, value }: { label: string; value: string }) {
   )
 }
 
-function ResourceBar({ label, used, total, unit }: { label: string; used: number; total: number; unit: string }) {
-  return (
-    <div>
-      <div className="flex items-center justify-between text-sm">
-        <span className="font-medium">{label}</span>
-        <span className="text-[var(--color-ink-muted)]">{used} / {total} {unit}</span>
-      </div>
-      <ProgressBar value={(used / total) * 100} tone={used / total > 0.8 ? 'warning' : 'brand'} />
-    </div>
-  )
-}
-
-function ProgressBar({ value, tone = 'brand' }: { value: number; tone?: 'brand' | 'warning' }) {
+function ProgressBar({ value }: { value: number }) {
   return (
     <div className="mt-2 h-2 overflow-hidden rounded-full bg-[var(--color-surface-muted)]">
-      <div className={cn('h-full rounded-full transition-all', tone === 'warning' ? 'bg-[var(--color-warning)]' : 'bg-[var(--color-brand)]')} style={{ width: `${Math.max(0, Math.min(100, value))}%` }} />
+      <div className="h-full rounded-full bg-[var(--color-brand)] transition-all" style={{ width: `${Math.max(0, Math.min(100, value))}%` }} />
     </div>
   )
 }
 
-function StatusBadge({ status }: { status: RangeRunSummary['status'] }) {
-  const variant = status === 'completed' ? 'success' : status === 'failed' || status === 'stopped' ? 'danger' : status === 'queued' ? 'muted' : evaluatingStatuses.includes(status) ? 'warning' : 'success'
+function StatusBadge({ status }: { status: PlatformTaskSummary['status'] }) {
+  const variant = status === 'completed' ? 'success' : status === 'failed' || status === 'stopped' ? 'danger' : status === 'queued' ? 'muted' : status === 'scoring' || status === 'evaluating' ? 'warning' : 'success'
   return <Badge variant={variant}>{statusText(status)}</Badge>
 }
 
-function statusText(status: RangeRunSummary['status']) {
+function summarize(tasks: PlatformTaskSummary[]) {
+  return {
+    total: tasks.length,
+    active: tasks.filter(isActivePlatformTask).length,
+    scenario: tasks.filter((task) => task.type === 'scenario_run').length,
+    benchmark: tasks.filter((task) => task.type === 'benchmark_run').length,
+    training: tasks.filter((task) => task.type === 'base_model_training').length,
+    completed: tasks.filter((task) => task.status === 'completed').length,
+    abnormal: tasks.filter((task) => task.status === 'failed' || task.status === 'stopped').length,
+  }
+}
+
+function buildLatestAssets({
+  trajectoryDatasets,
+  cptDatasets,
+  vulnerabilityDatasets,
+  benchmarkDatasets,
+  modelArtifacts,
+  onOpenDataset,
+  onOpenCorpus,
+  onOpenVulnerability,
+  onOpenBenchmark,
+  onOpenArtifact,
+}: {
+  trajectoryDatasets: ReturnType<typeof useDataCenter>['trajectoryDatasets']
+  cptDatasets: ReturnType<typeof useDataCenter>['cptDatasets']
+  vulnerabilityDatasets: ReturnType<typeof useDataCenter>['vulnerabilityDatasets']
+  benchmarkDatasets: ReturnType<typeof useDataCenter>['benchmarkDatasets']
+  modelArtifacts: ReturnType<typeof useDataCenter>['modelArtifacts']
+  onOpenDataset: (id: string) => void
+  onOpenCorpus: (id: string) => void
+  onOpenVulnerability: (id: string) => void
+  onOpenBenchmark: (id: string) => void
+  onOpenArtifact: (id: string) => void
+}): AssetItem[] {
+  return [
+    ...trajectoryDatasets.map((item) => ({
+      id: item.id,
+      name: item.name,
+      type: '轨迹数据集',
+      source: item.source,
+      meta: `${item.traceCount} 条轨迹`,
+      createdAt: item.updatedAt,
+      status: item.quality,
+      onOpen: () => onOpenDataset(item.id),
+    })),
+    ...cptDatasets.map((item) => ({
+      id: item.id,
+      name: item.name,
+      type: 'CPT 语料集',
+      source: item.source,
+      meta: `${item.documentCount} 篇 / ${compactNumber(item.tokenTotal)} tokens`,
+      createdAt: item.updatedAt,
+      status: item.status,
+      onOpen: () => onOpenCorpus(item.id),
+    })),
+    ...vulnerabilityDatasets.map((item) => ({
+      id: item.id,
+      name: item.name,
+      type: '漏洞数据集',
+      source: item.source,
+      meta: `${item.vulnerabilityCount} 条记录`,
+      createdAt: item.updatedAt,
+      status: item.status,
+      onOpen: () => onOpenVulnerability(item.id),
+    })),
+    ...benchmarkDatasets.map((item) => ({
+      id: item.id,
+      name: item.name,
+      type: 'Benchmark 数据集',
+      source: item.benchmarkType,
+      meta: `${item.taskCount} 个任务`,
+      createdAt: item.updatedAt,
+      status: item.status,
+      onOpen: () => onOpenBenchmark(item.id),
+    })),
+    ...modelArtifacts.map((item) => ({
+      id: item.id,
+      name: item.name,
+      type: '基模产物',
+      source: item.baseModel,
+      meta: `${item.version} / ${item.modelSize}`,
+      createdAt: item.createdAt,
+      status: item.status,
+      onOpen: () => onOpenArtifact(item.id),
+    })),
+  ]
+    .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+    .slice(0, 6)
+}
+
+function statusText(status: PlatformTaskSummary['status']) {
   return {
     queued: 'Queued',
     preparing: 'Preparing',
-    provisioning: 'Provisioning',
-    self_check: 'SelfCheck',
     running: 'Running',
-    evidence_sealing: 'EvidenceSealing',
-    destroying: 'Destroying',
     scoring: 'Scoring',
     evaluating: 'Evaluating',
     completed: 'Completed',
@@ -502,65 +664,33 @@ function statusText(status: RangeRunSummary['status']) {
   }[status]
 }
 
-function statusInfo(run: RangeRunSummary) {
-  if (run.status === 'running') return run.currentAction ?? '当前动作更新中'
-  if (run.status === 'queued') return `排队位置：${run.queuePosition ?? 1}，预计启动时间：${run.estimatedRemainingSeconds ? formatDuration(run.estimatedRemainingSeconds) : '-'}`
-  if (run.status === 'scoring' || run.status === 'evaluating') return run.currentAction ?? '评分进度和 Verifier 状态更新中'
-  if (run.status === 'failed') return `失败阶段：${run.currentStage}；原因：${run.errorMessage ?? '未知'}`
-  return run.currentAction ?? run.stageDescription ?? '状态更新中'
+function typeText(type: PlatformTaskType) {
+  return {
+    scenario_run: '场景演练',
+    benchmark_run: '基准评测',
+    base_model_training: '基模训练',
+  }[type]
 }
 
-function statusColor(status: RangeRunSummary['status']) {
+function typeBadgeClass(type: PlatformTaskType) {
+  if (type === 'benchmark_run') return 'border-violet-200 bg-violet-50 text-violet-700'
+  if (type === 'base_model_training') return 'border-cyan-200 bg-cyan-50 text-cyan-700'
+  return 'border-blue-200 bg-blue-50 text-blue-700'
+}
+
+function toneClass(tone: 'brand' | 'purple' | 'cyan', mode: 'soft') {
+  if (mode === 'soft' && tone === 'purple') return 'bg-violet-50 text-violet-700'
+  if (mode === 'soft' && tone === 'cyan') return 'bg-cyan-50 text-cyan-700'
+  return 'bg-[var(--color-brand-soft)] text-[var(--color-brand)]'
+}
+
+function statusColor(status: PlatformTaskSummary['status']) {
   if (status === 'queued') return 'bg-slate-400'
-  if (status === 'preparing' || status === 'provisioning' || status === 'self_check') return 'bg-[var(--color-brand)]'
   if (status === 'running' || status === 'completed') return 'bg-[var(--color-success)]'
-  if (evaluatingStatuses.includes(status)) return 'bg-[var(--color-warning)]'
+  if (status === 'scoring' || status === 'evaluating') return 'bg-[var(--color-warning)]'
   if (status === 'failed') return 'bg-[var(--color-danger)]'
-  return 'bg-rose-300'
-}
-
-function summarize(runs: RangeRunSummary[]) {
-  const concurrency = runs.filter((run) => activeStatuses.includes(run.status)).reduce((sum, run) => sum + run.concurrency, 0)
-  return {
-    total: runs.length,
-    running: runs.filter((run) => runningStatuses.includes(run.status)).length,
-    queued: runs.filter((run) => run.status === 'queued').length,
-    evaluating: runs.filter((run) => evaluatingStatuses.includes(run.status)).length,
-    completed: runs.filter((run) => run.status === 'completed').length,
-    abnormal: runs.filter((run) => run.status === 'failed' || run.status === 'stopped').length,
-    concurrency,
-  }
-}
-
-function resourceSummary(runs: RangeRunSummary[]) {
-  const active = runs.filter((run) => activeStatuses.includes(run.status))
-  return {
-    cpu: { used: active.reduce((sum, run) => sum + run.cpuCores, 0), total: 64 },
-    memory: { used: active.reduce((sum, run) => sum + run.memoryGb, 0), total: 256 },
-    vm: { used: active.reduce((sum, run) => sum + run.vmCount, 0), total: 20 },
-    container: { used: active.reduce((sum, run) => sum + run.containerCount, 0), total: 80 },
-    tokenUsed: runs.reduce((sum, run) => sum + run.tokenUsed, 0),
-    modelRequests: active.length * 3 + runs.filter((run) => evaluatingStatuses.includes(run.status)).length,
-    costUsed: runs.reduce((sum, run) => sum + run.costUsed, 0),
-  }
-}
-
-function sortRuns(runs: RangeRunSummary[]) {
-  const order: Record<RangeRunSummary['status'], number> = {
-    failed: 0,
-    running: 1,
-    self_check: 2,
-    preparing: 3,
-    provisioning: 3,
-    scoring: 4,
-    evaluating: 4,
-    evidence_sealing: 4,
-    destroying: 4,
-    queued: 5,
-    completed: 6,
-    stopped: 7,
-  }
-  return [...runs].sort((a, b) => order[a.status] - order[b.status] || b.updatedAt.localeCompare(a.updatedAt))
+  if (status === 'stopped') return 'bg-rose-300'
+  return 'bg-[var(--color-brand)]'
 }
 
 function formatDuration(seconds: number) {
@@ -574,6 +704,12 @@ function compactNumber(value: number) {
   if (value >= 1000000) return `${Math.round(value / 100000) / 10}M`
   if (value >= 1000) return `${Math.round(value / 1000)}K`
   return String(value)
+}
+
+function compactList(values?: string[]) {
+  if (!values?.length) return '-'
+  if (values.length === 1) return values[0]
+  return `${values[0]} 等 ${values.length} 个`
 }
 
 function dispositionText(status: DataDispositionStatus) {

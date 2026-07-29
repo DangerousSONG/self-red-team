@@ -41,6 +41,17 @@ export function Header({ onNavigate, onOpenResult }: HeaderProps) {
     <header className="sticky top-0 z-20 border-b border-[var(--color-border)] bg-white/90 backdrop-blur-md">
       <div className="flex items-start justify-between gap-6 px-6 py-4">
         <div className="min-w-0">
+          <div className="mb-2 flex flex-wrap items-center gap-2 text-xs text-[var(--color-ink-muted)]">
+            <button className="hover:text-[var(--color-brand)]" onClick={() => onNavigate('home')}>运行总览</button>
+            {currentRun ? (
+              <>
+                <span>/</span>
+                <span className="truncate">{currentTask?.name ?? currentRun.taskName}</span>
+                <span>/</span>
+                <span className="font-mono">{currentRun.id}</span>
+              </>
+            ) : null}
+          </div>
           <div className="mb-1.5 flex flex-wrap items-center gap-2">
             <Badge variant="outline" className="font-mono">
               <Shield className="h-3 w-3" />

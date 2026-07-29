@@ -9,11 +9,12 @@ import { VerdictBadge } from '@/pages/ResultsPage'
 interface ResultDetailPageProps {
   runId: string
   onNavigate: (id: string) => void
+  onOpenRun: (runId: string) => void
   onProcessData: (runId: string) => void
   onOpenDataset: (datasetId: string) => void
 }
 
-export function ResultDetailPage({ runId, onNavigate, onProcessData, onOpenDataset }: ResultDetailPageProps) {
+export function ResultDetailPage({ runId, onNavigate, onOpenRun, onProcessData, onOpenDataset }: ResultDetailPageProps) {
   const { results, trajectoryDatasets } = useDataCenter()
   const result = results.find((item) => item.runId === runId) ?? results[0]
   const relatedDataset =
@@ -26,6 +27,13 @@ export function ResultDetailPage({ runId, onNavigate, onProcessData, onOpenDatas
       <div className="mx-auto max-w-[1500px] space-y-5 pb-8">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
+            <div className="mb-2 flex items-center gap-2 text-xs text-[var(--color-ink-muted)]">
+              <button className="hover:text-[var(--color-brand)]" onClick={() => onNavigate('home')}>运行总览</button>
+              <span>/</span>
+              <button className="hover:text-[var(--color-brand)]" onClick={() => onNavigate('results')}>评分结果</button>
+              <span>/</span>
+              <span className="font-mono">{result.runId}</span>
+            </div>
             <Badge variant="outline">
               <FileText className="h-3.5 w-3.5" />
               Evaluation Report
@@ -34,9 +42,9 @@ export function ResultDetailPage({ runId, onNavigate, onProcessData, onOpenDatas
             <p className="mt-1 font-mono text-xs text-[var(--color-ink-muted)]">{result.runId}</p>
           </div>
           <div className="flex flex-wrap gap-2">
-            <Button variant="secondary" onClick={() => onNavigate('rangerun')}>
+            <Button variant="secondary" onClick={() => onOpenRun(result.runId)}>
               <ArrowLeft className="h-4 w-4" />
-              返回 RangeRun
+              返回运行
             </Button>
             <Button variant="outline" onClick={() => window.alert('Mock：报告导出请求已记录。')}>
               <Download className="h-4 w-4" />

@@ -71,7 +71,7 @@ interface RangeTaskContextValue {
   stopRun: () => RangeRun | null
   completeRun: () => RangeRun | null
   duplicateTask: (taskId: string) => Task | null
-  setFocusedRun: (runId: string) => RangeRunSummary | null
+  setFocusedRun: (runId: string, fallback?: Partial<RangeRunSummary>) => RangeRunSummary | null
   advanceRunSummaries: () => void
   stopRunSummary: (runId: string) => void
 }
@@ -394,6 +394,35 @@ export function RangeTaskProvider({ children }: { children: ReactNode }) {
     setCurrentCasePlan(casePlan)
     setCurrentRun(run)
     setFocusedRunId(run.id)
+    setRunSummaries((items) => [
+      {
+        id: run.id,
+        taskName: task.name,
+        category: task.benchmark ? 'benchmark' : 'scenario',
+        benchmark: task.benchmark as RangeRunSummary['benchmark'],
+        status: 'running',
+        progress: 8,
+        currentStage: 'Preparing',
+        stageDescription: '从任务列表启动，正在准备 Mock RangeRun。',
+        environment: task.environment,
+        agent: task.agent,
+        model: task.model,
+        concurrency: defaultRunConfig.concurrency,
+        elapsedSeconds: 0,
+        estimatedRemainingSeconds: defaultRunConfig.timeoutMinutes * 60,
+        tokenUsed: 0,
+        tokenBudget: defaultRunConfig.tokenBudget,
+        costUsed: 0,
+        costBudget: defaultRunConfig.costBudget,
+        cpuCores: defaultRunConfig.cpuCores,
+        memoryGb: defaultRunConfig.memoryGb,
+        vmCount: task.benchmark ? 1 : 3,
+        containerCount: task.benchmark ? 4 : 8,
+        currentAction: '当前动作：初始化运行环境',
+        updatedAt: nowText(),
+      },
+      ...items.filter((item) => item.id !== run.id),
+    ])
     setTaskList((items) => items.map((item) => (item.id === task.id ? { ...item, status: 'running' } : item)))
     return run
   }, [taskList])
@@ -424,9 +453,40 @@ export function RangeTaskProvider({ children }: { children: ReactNode }) {
     return copy
   }, [taskList])
 
-  const setFocusedRun = useCallback((runId: string) => {
-    const summary = runSummaries.find((item) => item.id === runId)
+  const setFocusedRun = useCallback((runId: string, fallback?: Partial<RangeRunSummary>) => {
+    const summary = runSummaries.find((item) => item.id === runId) ?? (
+      fallback?.taskName
+        ? {
+            id: runId,
+            taskName: fallback.taskName,
+            category: fallback.category ?? 'scenario',
+            benchmark: fallback.benchmark,
+            status: fallback.status ?? 'completed',
+            progress: fallback.progress ?? 100,
+            currentStage: fallback.currentStage ?? 'Completed',
+            stageDescription: fallback.stageDescription ?? '历史运行记录，已完成评分并生成报告。',
+            environment: fallback.environment ?? 'historical-mock-range',
+            agent: fallback.agent ?? 'Mock Agent',
+            model: fallback.model ?? 'Mock Model',
+            concurrency: fallback.concurrency ?? 0,
+            elapsedSeconds: fallback.elapsedSeconds ?? 0,
+            estimatedRemainingSeconds: fallback.estimatedRemainingSeconds,
+            tokenUsed: fallback.tokenUsed ?? 0,
+            tokenBudget: fallback.tokenBudget ?? 1,
+            costUsed: fallback.costUsed ?? 0,
+            costBudget: fallback.costBudget ?? 1,
+            cpuCores: fallback.cpuCores ?? 0,
+            memoryGb: fallback.memoryGb ?? 0,
+            vmCount: fallback.vmCount ?? 0,
+            containerCount: fallback.containerCount ?? 0,
+            updatedAt: fallback.updatedAt ?? nowText(),
+          }
+        : undefined
+    )
     if (!summary) return null
+    if (!runSummaries.some((item) => item.id === runId)) {
+      setRunSummaries((items) => [summary, ...items])
+    }
     setFocusedRunId(runId)
     setCurrentRun(buildRunFromSummary(summary))
     setCurrentTask(taskFromSummary(summary))

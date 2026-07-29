@@ -12,12 +12,13 @@ interface ResultsPageProps {
   onOpenResult: (runId: string) => void
   onProcessData: (runId: string) => void
   onOpenDataset: (datasetId: string) => void
+  onOpenRun: (runId: string) => void
   onNavigate: (id: string) => void
 }
 
 type ResultTab = '基准评测' | '场景演练'
 
-export function ResultsPage({ onOpenResult, onProcessData, onOpenDataset, onNavigate }: ResultsPageProps) {
+export function ResultsPage({ onOpenResult, onProcessData, onOpenDataset, onOpenRun }: ResultsPageProps) {
   const { results } = useDataCenter()
   const [activeTab, setActiveTab] = useState<ResultTab>('基准评测')
   const [toast, setToast] = useState('')
@@ -80,7 +81,7 @@ export function ResultsPage({ onOpenResult, onProcessData, onOpenDataset, onNavi
                   onOpenResult={onOpenResult}
                   onProcessData={onProcessData}
                   onOpenDataset={onOpenDataset}
-                  onNavigate={onNavigate}
+                  onOpenRun={onOpenRun}
                   onToast={showToast}
                 />
               ) : (
@@ -89,7 +90,7 @@ export function ResultsPage({ onOpenResult, onProcessData, onOpenDataset, onNavi
                   onOpenResult={onOpenResult}
                   onProcessData={onProcessData}
                   onOpenDataset={onOpenDataset}
-                  onNavigate={onNavigate}
+                  onOpenRun={onOpenRun}
                   onToast={showToast}
                 />
               )}
@@ -107,7 +108,7 @@ function BenchmarkTable({
   onOpenResult,
   onProcessData,
   onOpenDataset,
-  onNavigate,
+  onOpenRun,
   onToast,
 }: ResultTableProps) {
   return (
@@ -135,7 +136,7 @@ function BenchmarkTable({
             <td className="px-3 py-3">{result.cost} 元</td>
             <td className="px-3 py-3"><DataStatus result={result} onOpenDataset={onOpenDataset} onToast={onToast} /></td>
             <td className="px-3 py-3">{result.completedAt}</td>
-            <td className="px-3 py-3"><ResultActions result={result} onOpenResult={onOpenResult} onProcessData={onProcessData} onNavigate={onNavigate} rangeLabel="返回运行" /></td>
+            <td className="px-3 py-3"><ResultActions result={result} onOpenResult={onOpenResult} onProcessData={onProcessData} onOpenRun={onOpenRun} rangeLabel="返回运行" /></td>
           </tr>
         ))}
       </tbody>
@@ -148,7 +149,7 @@ function ScenarioTable({
   onOpenResult,
   onProcessData,
   onOpenDataset,
-  onNavigate,
+  onOpenRun,
   onToast,
 }: ResultTableProps) {
   return (
@@ -177,7 +178,7 @@ function ScenarioTable({
             <td className="px-3 py-3">{result.cost} 元</td>
             <td className="px-3 py-3"><DataStatus result={result} onOpenDataset={onOpenDataset} onToast={onToast} /></td>
             <td className="px-3 py-3">{result.completedAt}</td>
-            <td className="px-3 py-3"><ResultActions result={result} onOpenResult={onOpenResult} onProcessData={onProcessData} onNavigate={onNavigate} rangeLabel="查看 RangeRun" /></td>
+            <td className="px-3 py-3"><ResultActions result={result} onOpenResult={onOpenResult} onProcessData={onProcessData} onOpenRun={onOpenRun} rangeLabel="查看来源运行" /></td>
           </tr>
         ))}
       </tbody>
@@ -190,7 +191,7 @@ type ResultTableProps = {
   onOpenResult: (runId: string) => void
   onProcessData: (runId: string) => void
   onOpenDataset: (datasetId: string) => void
-  onNavigate: (id: string) => void
+  onOpenRun: (runId: string) => void
   onToast: (message: string) => void
 }
 
@@ -224,13 +225,13 @@ function ResultActions({
   result,
   onOpenResult,
   onProcessData,
-  onNavigate,
+  onOpenRun,
   rangeLabel,
 }: {
   result: EvaluationResult
   onOpenResult: (runId: string) => void
   onProcessData: (runId: string) => void
-  onNavigate: (id: string) => void
+  onOpenRun: (runId: string) => void
   rangeLabel: string
 }) {
   return (
@@ -243,7 +244,7 @@ function ResultActions({
         <Database className="h-3.5 w-3.5" />
         处理数据
       </Button>
-      <Button size="sm" variant="ghost" onClick={() => onNavigate('rangerun')}>
+      <Button size="sm" variant="ghost" onClick={() => onOpenRun(result.runId)}>
         {rangeLabel}
       </Button>
     </div>

@@ -21,16 +21,21 @@ const statusVariant = {
 
 interface TaskListTableProps {
   onEdit: (task: Task) => void
-  onViewRun: () => void
+  onViewRun: (runId?: string) => void
 }
 
 export function TaskListTable({ onEdit, onViewRun }: TaskListTableProps) {
-  const { taskList, startExistingTask, duplicateTask } = useRangeTasks()
+  const { taskList, runSummaries, startExistingTask, duplicateTask } = useRangeTasks()
 
   const handleStart = async (taskId: string) => {
-    await startExistingTask(taskId)
-    onViewRun()
+    const run = await startExistingTask(taskId)
+    onViewRun(run?.id)
   }
+
+  const findRunForTask = (task: Task) =>
+    runSummaries.find((run) => run.taskName === task.name) ??
+    runSummaries.find((run) => task.name.includes(run.taskName) || run.taskName.includes(task.name)) ??
+    runSummaries.find((run) => task.benchmark && run.benchmark === task.benchmark)
 
   return (
     <Card>
@@ -76,7 +81,7 @@ export function TaskListTable({ onEdit, onViewRun }: TaskListTableProps) {
                         <Play className="h-3.5 w-3.5" />
                         启动
                       </Button>
-                      <Button size="sm" variant="ghost" onClick={onViewRun}>
+                      <Button size="sm" variant="ghost" onClick={() => onViewRun(findRunForTask(task)?.id)}>
                         <Eye className="h-3.5 w-3.5" />
                         查看运行
                       </Button>

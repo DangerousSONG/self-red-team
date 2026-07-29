@@ -57,6 +57,13 @@ export function TrainingJobDetailPage({ jobId, onNavigate, onOpenCpt, onOpenVuln
       <div className="mx-auto max-w-[1500px] space-y-5 pb-8">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
+            <div className="mb-2 flex items-center gap-2 text-xs text-[var(--color-ink-muted)]">
+              <button className="hover:text-[var(--color-brand)]" onClick={() => onNavigate('home')}>运行总览</button>
+              <span>/</span>
+              <button className="hover:text-[var(--color-brand)]" onClick={() => onNavigate('training')}>基模训练</button>
+              <span>/</span>
+              <span className="font-mono">{job.id}</span>
+            </div>
             <Badge variant="outline">Training Detail</Badge>
             <h1 className="mt-2 text-2xl font-semibold">{job.name}</h1>
             <p className="mt-1 text-sm text-[var(--color-ink-secondary)]">{job.id} / {job.baseModel} / {methodText(job.trainingMethod)}</p>
