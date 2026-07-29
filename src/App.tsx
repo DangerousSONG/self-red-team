@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Sidebar } from '@/components/layout/Sidebar'
 import { Header } from '@/components/layout/Header'
+import { ErrorBoundary } from '@/components/ErrorBoundary'
 import { Button } from '@/components/ui/button'
 import {
   Dialog,
@@ -45,7 +46,9 @@ export default function App() {
               <DashboardPage onNavigate={handleNavigate} />
             </>
           ) : (
-            <TasksPage onNavigate={handleNavigate} onDirtyChange={setTasksDirty} />
+            <ErrorBoundary>
+              <TasksPage onNavigate={handleNavigate} onDirtyChange={setTasksDirty} />
+            </ErrorBoundary>
           )}
         </div>
       </div>

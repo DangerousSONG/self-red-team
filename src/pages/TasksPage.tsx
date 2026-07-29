@@ -84,6 +84,22 @@ export function TasksPage({ onNavigate, onDirtyChange }: TasksPageProps) {
   const errorSteps = configValid ? [] : [2]
 
   useEffect(() => {
+    if (selectedTemplateId && !taskTemplates.some((task) => task.id === selectedTemplateId)) {
+      setSelectedTemplateId('')
+      setEnvironmentId('')
+      setAgentId('')
+      setModelId('')
+      setStep(0)
+    }
+  }, [selectedTemplateId])
+
+  useEffect(() => {
+    if (step > maxReachableStep) {
+      setStep(maxReachableStep)
+    }
+  }, [maxReachableStep, step])
+
+  useEffect(() => {
     onDirtyChange?.(dirty)
   }, [dirty, onDirtyChange])
 

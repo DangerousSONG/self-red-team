@@ -75,9 +75,69 @@ const RangeTaskContext = createContext<RangeTaskContextValue | null>(null)
 function readStorage<T>(key: string, fallback: T): T {
   try {
     const raw = window.localStorage.getItem(key)
-    return raw ? (JSON.parse(raw) as T) : fallback
+    if (!raw) return fallback
+    const parsed = JSON.parse(raw) as T
+    if (parsed == null && fallback != null) return fallback
+    if (Array.isArray(fallback) && !Array.isArray(parsed)) return fallback
+    if (
+      typeof fallback === 'object' &&
+      fallback !== null &&
+      !Array.isArray(fallback) &&
+      typeof parsed !== 'object'
+    ) {
+      return fallback
+    }
+    return parsed
   } catch {
     return fallback
+  }
+}
+
+function normalizeRunConfig(config?: Partial<RunConfig>): RunConfig {
+  return {
+    ...defaultRunConfig,
+    ...(config ?? {}),
+    runName: config?.runName?.trim() ? config.runName : defaultRunConfig.runName,
+    timeoutMinutes: Number.isFinite(config?.timeoutMinutes)
+      ? Number(config?.timeoutMinutes)
+      : defaultRunConfig.timeoutMinutes,
+    tokenBudget: Number.isFinite(config?.tokenBudget)
+      ? Number(config?.tokenBudget)
+      : defaultRunConfig.tokenBudget,
+    costBudget: Number.isFinite(config?.costBudget)
+      ? Number(config?.costBudget)
+      : defaultRunConfig.costBudget,
+    concurrency: Number.isFinite(config?.concurrency)
+      ? Number(config?.concurrency)
+      : defaultRunConfig.concurrency,
+    maxSteps: Number.isFinite(config?.maxSteps)
+      ? Number(config?.maxSteps)
+      : defaultRunConfig.maxSteps,
+    cpuCores: Number.isFinite(config?.cpuCores)
+      ? Number(config?.cpuCores)
+      : defaultRunConfig.cpuCores,
+    memoryGb: Number.isFinite(config?.memoryGb)
+      ? Number(config?.memoryGb)
+      : defaultRunConfig.memoryGb,
+    autoStopCondition: config?.autoStopCondition?.trim()
+      ? config.autoStopCondition
+      : defaultRunConfig.autoStopCondition,
+  }
+}
+
+function normalizeDraftProgress(progress?: Partial<DraftProgress> | null): DraftProgress {
+  const safeStep =
+    typeof progress?.step === 'number' && Number.isFinite(progress.step)
+      ? Math.min(3, Math.max(0, progress.step))
+      : 0
+  return {
+    step: safeStep,
+    selectedTemplateId:
+      typeof progress?.selectedTemplateId === 'string' ? progress.selectedTemplateId : undefined,
+    environmentId: typeof progress?.environmentId === 'string' ? progress.environmentId : undefined,
+    agentId: typeof progress?.agentId === 'string' ? progress.agentId : undefined,
+    modelId: typeof progress?.modelId === 'string' ? progress.modelId : undefined,
+    runConfig: normalizeRunConfig(progress?.runConfig),
   }
 }
 
@@ -173,7 +233,10 @@ function findResourceFallback(task: Task) {
 }
 
 export function RangeTaskProvider({ children }: { children: ReactNode }) {
-  const [taskList, setTaskList] = useState<Task[]>(() => readStorage(TASKS_KEY, initialTasks))
+  const [taskList, setTaskList] = useState<Task[]>(() => {
+    const storedTasks = readStorage<Task[]>(TASKS_KEY, initialTasks)
+    return Array.isArray(storedTasks) && storedTasks.length > 0 ? storedTasks : initialTasks
+  })
   const [currentTask, setCurrentTask] = useState<Task | null>(() =>
     readStorage(CURRENT_TASK_KEY, null),
   )
@@ -184,7 +247,7 @@ export function RangeTaskProvider({ children }: { children: ReactNode }) {
     readStorage(CURRENT_RUN_KEY, null),
   )
   const [draftProgress, setDraftProgressState] = useState<DraftProgress>(() =>
-    readStorage(DRAFT_PROGRESS_KEY, { step: 0, runConfig: defaultRunConfig }),
+    normalizeDraftProgress(readStorage<Partial<DraftProgress> | null>(DRAFT_PROGRESS_KEY, null)),
   )
 
   useEffect(() => writeStorage(TASKS_KEY, taskList), [taskList])
@@ -194,7 +257,7 @@ export function RangeTaskProvider({ children }: { children: ReactNode }) {
   useEffect(() => writeStorage(DRAFT_PROGRESS_KEY, draftProgress), [draftProgress])
 
   const setDraftProgress = useCallback((progress: DraftProgress) => {
-    setDraftProgressState(progress)
+    setDraftProgressState(normalizeDraftProgress(progress))
   }, [])
 
   const createTask = useCallback((input: TaskBuildInput, status: TaskStatus = 'configured') => {
