@@ -1,21 +1,41 @@
 import { useState } from 'react'
-import { ArrowLeft, FilePlus2, Octagon, Shield } from 'lucide-react'
+import { ArrowLeft, CheckCircle2, FilePlus2, FileText, Octagon, Shield } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import { useDataCenter } from '@/hooks/useDataCenter'
 import { useRangeTasks } from '@/hooks/useRangeTasks'
 
 interface HeaderProps {
   onNavigate: (id: string) => void
+  onOpenResult?: (runId: string) => void
 }
 
-export function Header({ onNavigate }: HeaderProps) {
-  const { currentRun, currentTask, stopRun } = useRangeTasks()
+export function Header({ onNavigate, onOpenResult }: HeaderProps) {
+  const { currentRun, currentTask, stopRun, completeRun } = useRangeTasks()
+  const { generateResult } = useDataCenter()
   const [notice, setNotice] = useState('')
 
   const handleStop = () => {
     stopRun()
     setNotice('当前任务已停止，Mock RangeRun 状态已更新为 Stopped。')
   }
+
+  const handleComplete = () => {
+    const run = completeRun()
+    if (run) {
+      generateResult(run)
+      setNotice('Mock 生命周期已进入 Completed，最终 Verdict 已生成。')
+    }
+  }
+
+  const handleOpenReport = () => {
+    if (!currentRun) return
+    generateResult(currentRun)
+    onOpenResult?.(currentRun.id)
+  }
+
+  const completed = currentRun?.status === 'Completed'
+  const running = currentRun?.status === 'Running'
 
   return (
     <header className="sticky top-0 z-20 border-b border-[var(--color-border)] bg-white/90 backdrop-blur-md">
@@ -27,11 +47,9 @@ export function Header({ onNavigate }: HeaderProps) {
               CONTROL PLANE
             </Badge>
             {currentRun ? (
-              <Badge variant={currentRun.status === 'Running' ? 'success' : 'warning'}>
-                {currentRun.status === 'Running' ? (
-                  <span className="status-pulse h-1.5 w-1.5 rounded-full bg-[var(--color-success)]" />
-                ) : null}
-                {currentRun.status}
+              <Badge variant={completed ? 'success' : running ? 'success' : 'warning'}>
+                {running ? <span className="status-pulse h-1.5 w-1.5 rounded-full bg-[var(--color-success)]" /> : null}
+                {completed ? '已完成' : currentRun.status}
               </Badge>
             ) : (
               <Badge variant="muted">NO ACTIVE RUN</Badge>
@@ -51,7 +69,7 @@ export function Header({ onNavigate }: HeaderProps) {
               <InfoItem label="环境" value={currentRun.environment} />
               <InfoItem label="Agent" value={currentRun.agent} />
               <InfoItem label="模型" value={currentRun.model} />
-              <InfoItem label="状态" value={currentRun.status} />
+              <InfoItem label="状态" value={completed ? 'Completed' : currentRun.status} />
             </div>
           ) : null}
           {notice ? (
@@ -68,10 +86,23 @@ export function Header({ onNavigate }: HeaderProps) {
                 <ArrowLeft className="h-4 w-4" />
                 返回任务
               </Button>
-              <Button variant="outline" onClick={handleStop} disabled={currentRun.status === 'Stopped'}>
-                <Octagon className="h-4 w-4" />
-                停止任务
-              </Button>
+              {running ? (
+                <Button variant="outline" onClick={handleComplete}>
+                  <CheckCircle2 className="h-4 w-4" />
+                  完成演练
+                </Button>
+              ) : null}
+              {completed ? (
+                <Button onClick={handleOpenReport}>
+                  <FileText className="h-4 w-4" />
+                  查看评测报告
+                </Button>
+              ) : (
+                <Button variant="outline" onClick={handleStop} disabled={currentRun.status === 'Stopped'}>
+                  <Octagon className="h-4 w-4" />
+                  停止任务
+                </Button>
+              )}
             </>
           ) : (
             <Button onClick={() => onNavigate('tasks')}>

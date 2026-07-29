@@ -8,11 +8,7 @@ import {
   type ReactNode,
 } from 'react'
 import { initialTasks } from '@/lib/mock-data/tasks'
-import {
-  agentProfiles,
-  modelProfiles,
-  rangeEnvironments,
-} from '@/lib/mock-data/resources'
+import { agentProfiles, modelProfiles, rangeEnvironments } from '@/lib/mock-data/resources'
 import type {
   AgentProfile,
   CasePlan,
@@ -67,6 +63,7 @@ interface RangeTaskContextValue {
   startRun: (input: TaskBuildInput) => Promise<RangeRun>
   startExistingTask: (taskId: string) => Promise<RangeRun | null>
   stopRun: () => RangeRun | null
+  completeRun: () => RangeRun | null
   duplicateTask: (taskId: string) => Task | null
 }
 
@@ -79,12 +76,7 @@ function readStorage<T>(key: string, fallback: T): T {
     const parsed = JSON.parse(raw) as T
     if (parsed == null && fallback != null) return fallback
     if (Array.isArray(fallback) && !Array.isArray(parsed)) return fallback
-    if (
-      typeof fallback === 'object' &&
-      fallback !== null &&
-      !Array.isArray(fallback) &&
-      typeof parsed !== 'object'
-    ) {
+    if (typeof fallback === 'object' && fallback !== null && !Array.isArray(fallback) && typeof parsed !== 'object') {
       return fallback
     }
     return parsed
@@ -98,30 +90,14 @@ function normalizeRunConfig(config?: Partial<RunConfig>): RunConfig {
     ...defaultRunConfig,
     ...(config ?? {}),
     runName: config?.runName?.trim() ? config.runName : defaultRunConfig.runName,
-    timeoutMinutes: Number.isFinite(config?.timeoutMinutes)
-      ? Number(config?.timeoutMinutes)
-      : defaultRunConfig.timeoutMinutes,
-    tokenBudget: Number.isFinite(config?.tokenBudget)
-      ? Number(config?.tokenBudget)
-      : defaultRunConfig.tokenBudget,
-    costBudget: Number.isFinite(config?.costBudget)
-      ? Number(config?.costBudget)
-      : defaultRunConfig.costBudget,
-    concurrency: Number.isFinite(config?.concurrency)
-      ? Number(config?.concurrency)
-      : defaultRunConfig.concurrency,
-    maxSteps: Number.isFinite(config?.maxSteps)
-      ? Number(config?.maxSteps)
-      : defaultRunConfig.maxSteps,
-    cpuCores: Number.isFinite(config?.cpuCores)
-      ? Number(config?.cpuCores)
-      : defaultRunConfig.cpuCores,
-    memoryGb: Number.isFinite(config?.memoryGb)
-      ? Number(config?.memoryGb)
-      : defaultRunConfig.memoryGb,
-    autoStopCondition: config?.autoStopCondition?.trim()
-      ? config.autoStopCondition
-      : defaultRunConfig.autoStopCondition,
+    timeoutMinutes: Number.isFinite(config?.timeoutMinutes) ? Number(config?.timeoutMinutes) : defaultRunConfig.timeoutMinutes,
+    tokenBudget: Number.isFinite(config?.tokenBudget) ? Number(config?.tokenBudget) : defaultRunConfig.tokenBudget,
+    costBudget: Number.isFinite(config?.costBudget) ? Number(config?.costBudget) : defaultRunConfig.costBudget,
+    concurrency: Number.isFinite(config?.concurrency) ? Number(config?.concurrency) : defaultRunConfig.concurrency,
+    maxSteps: Number.isFinite(config?.maxSteps) ? Number(config?.maxSteps) : defaultRunConfig.maxSteps,
+    cpuCores: Number.isFinite(config?.cpuCores) ? Number(config?.cpuCores) : defaultRunConfig.cpuCores,
+    memoryGb: Number.isFinite(config?.memoryGb) ? Number(config?.memoryGb) : defaultRunConfig.memoryGb,
+    autoStopCondition: config?.autoStopCondition?.trim() ? config.autoStopCondition : defaultRunConfig.autoStopCondition,
   }
 }
 
@@ -132,8 +108,7 @@ function normalizeDraftProgress(progress?: Partial<DraftProgress> | null): Draft
       : 0
   return {
     step: safeStep,
-    selectedTemplateId:
-      typeof progress?.selectedTemplateId === 'string' ? progress.selectedTemplateId : undefined,
+    selectedTemplateId: typeof progress?.selectedTemplateId === 'string' ? progress.selectedTemplateId : undefined,
     environmentId: typeof progress?.environmentId === 'string' ? progress.environmentId : undefined,
     agentId: typeof progress?.agentId === 'string' ? progress.agentId : undefined,
     modelId: typeof progress?.modelId === 'string' ? progress.modelId : undefined,
@@ -225,8 +200,7 @@ function buildRun(task: Task, casePlan: CasePlan): RangeRun {
 }
 
 function findResourceFallback(task: Task) {
-  const environment =
-    rangeEnvironments.find((item) => item.name === task.environment) ?? rangeEnvironments[0]
+  const environment = rangeEnvironments.find((item) => item.name === task.environment) ?? rangeEnvironments[0]
   const agent = agentProfiles.find((item) => item.name === task.agent) ?? agentProfiles[0]
   const model = modelProfiles.find((item) => item.name === task.model) ?? modelProfiles[0]
   return { environment, agent, model }
@@ -237,15 +211,9 @@ export function RangeTaskProvider({ children }: { children: ReactNode }) {
     const storedTasks = readStorage<Task[]>(TASKS_KEY, initialTasks)
     return Array.isArray(storedTasks) && storedTasks.length > 0 ? storedTasks : initialTasks
   })
-  const [currentTask, setCurrentTask] = useState<Task | null>(() =>
-    readStorage(CURRENT_TASK_KEY, null),
-  )
-  const [currentCasePlan, setCurrentCasePlan] = useState<CasePlan | null>(() =>
-    readStorage(CURRENT_CASE_PLAN_KEY, null),
-  )
-  const [currentRun, setCurrentRun] = useState<RangeRun | null>(() =>
-    readStorage(CURRENT_RUN_KEY, null),
-  )
+  const [currentTask, setCurrentTask] = useState<Task | null>(() => readStorage(CURRENT_TASK_KEY, null))
+  const [currentCasePlan, setCurrentCasePlan] = useState<CasePlan | null>(() => readStorage(CURRENT_CASE_PLAN_KEY, null))
+  const [currentRun, setCurrentRun] = useState<RangeRun | null>(() => readStorage(CURRENT_RUN_KEY, null))
   const [draftProgress, setDraftProgressState] = useState<DraftProgress>(() =>
     normalizeDraftProgress(readStorage<Partial<DraftProgress> | null>(DRAFT_PROGRESS_KEY, null)),
   )
@@ -269,27 +237,16 @@ export function RangeTaskProvider({ children }: { children: ReactNode }) {
     return { task, casePlan }
   }, [])
 
-  const saveDraft = useCallback(
-    (input: TaskBuildInput) => {
-      const { task } = createTask(input, 'draft')
-      return task
-    },
-    [createTask],
-  )
+  const saveDraft = useCallback((input: TaskBuildInput) => createTask(input, 'draft').task, [createTask])
 
-  const startRun = useCallback(
-    async (input: TaskBuildInput) => {
-      const { task, casePlan } = createTask(input, 'running')
-      const run = buildRun(task, casePlan)
-      setCurrentRun(run)
-      setTaskList((items) =>
-        items.map((item) => (item.id === task.id ? { ...item, status: 'running' } : item)),
-      )
-      setDraftProgressState({ step: 0, runConfig: defaultRunConfig })
-      return run
-    },
-    [createTask],
-  )
+  const startRun = useCallback(async (input: TaskBuildInput) => {
+    const { task, casePlan } = createTask(input, 'running')
+    const run = buildRun(task, casePlan)
+    setCurrentRun(run)
+    setTaskList((items) => items.map((item) => (item.id === task.id ? { ...item, status: 'running' } : item)))
+    setDraftProgressState({ step: 0, runConfig: defaultRunConfig })
+    return run
+  }, [createTask])
 
   const startExistingTask = useCallback(async (taskId: string) => {
     const task = taskList.find((item) => item.id === taskId)
@@ -299,17 +256,21 @@ export function RangeTaskProvider({ children }: { children: ReactNode }) {
       {
         template: {
           id: task.templateId,
+          category: task.benchmark ? 'benchmark' : 'scenario',
           name: task.name,
           type: task.type,
           environmentKind: resources.environment.environmentType,
           difficulty: '中级',
           objective: task.objective,
+          evaluationTarget: task.benchmark ? 'Benchmark Agent' : '攻防 Agent',
+          scoringMethod: 'Mock 综合评分',
           estimatedDuration: `${defaultRunConfig.timeoutMinutes} 分钟`,
           description: task.objective,
           input: '本地 Mock 输入',
           output: '本地 Mock 输出',
           successCriteria: task.objective,
           benchmark: task.benchmark,
+          runnable: true,
         },
         ...resources,
         runConfig: { ...defaultRunConfig, runName: task.name },
@@ -320,9 +281,7 @@ export function RangeTaskProvider({ children }: { children: ReactNode }) {
     setCurrentTask({ ...task, status: 'running' })
     setCurrentCasePlan(casePlan)
     setCurrentRun(run)
-    setTaskList((items) =>
-      items.map((item) => (item.id === task.id ? { ...item, status: 'running' } : item)),
-    )
+    setTaskList((items) => items.map((item) => (item.id === task.id ? { ...item, status: 'running' } : item)))
     return run
   }, [taskList])
 
@@ -330,24 +289,22 @@ export function RangeTaskProvider({ children }: { children: ReactNode }) {
     if (!currentRun) return null
     const stoppedRun: RangeRun = { ...currentRun, status: 'Stopped' }
     setCurrentRun(stoppedRun)
-    setTaskList((items) =>
-      items.map((item) =>
-        item.id === currentRun.taskId ? { ...item, status: 'configured' } : item,
-      ),
-    )
+    setTaskList((items) => items.map((item) => (item.id === currentRun.taskId ? { ...item, status: 'configured' } : item)))
     return stoppedRun
+  }, [currentRun])
+
+  const completeRun = useCallback(() => {
+    if (!currentRun) return null
+    const completedRun: RangeRun = { ...currentRun, status: 'Completed' }
+    setCurrentRun(completedRun)
+    setTaskList((items) => items.map((item) => (item.id === currentRun.taskId ? { ...item, status: 'completed' } : item)))
+    return completedRun
   }, [currentRun])
 
   const duplicateTask = useCallback((taskId: string) => {
     const task = taskList.find((item) => item.id === taskId)
     if (!task) return null
-    const copy: Task = {
-      ...task,
-      id: makeId('task-copy'),
-      name: `${task.name} 副本`,
-      status: 'draft',
-      createdAt: nowText(),
-    }
+    const copy: Task = { ...task, id: makeId('task-copy'), name: `${task.name} 副本`, status: 'draft', createdAt: nowText() }
     setTaskList((items) => [copy, ...items])
     return copy
   }, [taskList])
@@ -365,6 +322,7 @@ export function RangeTaskProvider({ children }: { children: ReactNode }) {
       startRun,
       startExistingTask,
       stopRun,
+      completeRun,
       duplicateTask,
     }),
     [
@@ -379,6 +337,7 @@ export function RangeTaskProvider({ children }: { children: ReactNode }) {
       startRun,
       startExistingTask,
       stopRun,
+      completeRun,
       duplicateTask,
     ],
   )
@@ -388,8 +347,6 @@ export function RangeTaskProvider({ children }: { children: ReactNode }) {
 
 export function useRangeTasks() {
   const context = useContext(RangeTaskContext)
-  if (!context) {
-    throw new Error('useRangeTasks must be used within RangeTaskProvider')
-  }
+  if (!context) throw new Error('useRangeTasks must be used within RangeTaskProvider')
   return context
 }

@@ -3,6 +3,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Badge } from '@/components/ui/badge'
 import { evidencePipeline } from '@/lib/data'
 import { cn } from '@/lib/utils'
+import { useRangeTasks } from '@/hooks/useRangeTasks'
 
 const metrics = [
   { label: '攻击成功率', value: '62%', delta: '+4%', up: true, tone: 'brand' },
@@ -20,6 +21,9 @@ const toneClass: Record<string, string> = {
 }
 
 export function EvidenceScoring() {
+  const { currentRun } = useRangeTasks()
+  const completed = currentRun?.status === 'Completed'
+
   return (
     <Card>
       <CardHeader className="px-3.5 pb-2 pt-3.5">
@@ -32,12 +36,17 @@ export function EvidenceScoring() {
           </div>
           <Badge variant="outline" className="font-mono">
             <Fingerprint className="h-3 w-3" />
-            TRUSTED
+            {completed ? 'FINAL VERDICT' : 'TRUSTED'}
           </Badge>
         </div>
       </CardHeader>
 
       <CardContent className="space-y-3 px-3.5 pb-3.5">
+        {completed ? (
+          <div className="rounded-lg border border-[var(--color-success)]/25 bg-[var(--color-success-soft)] px-3 py-2 text-sm font-semibold text-[var(--color-success)]">
+            Verdict: Success / Evidence sealed / Offline scoring completed
+          </div>
+        ) : null}
         <div className="flex flex-wrap items-center gap-1.5">
           {evidencePipeline.map((step, index) => (
             <div key={step.id} className="flex items-center gap-1.5">

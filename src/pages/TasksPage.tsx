@@ -1,5 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
-import type { ReactNode } from 'react'
+import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import { ClipboardList, ListChecks, Loader2 } from 'lucide-react'
 import { CasePlanAside } from '@/components/tasks/CasePlanAside'
 import { CasePlanSummary } from '@/components/tasks/CasePlanSummary'
@@ -21,7 +20,7 @@ import { agentProfiles, defaultResourceMatches, modelProfiles, rangeEnvironments
 import { taskTemplates } from '@/lib/mock-data/tasks'
 import { cn } from '@/lib/utils'
 import { defaultRunConfig, useRangeTasks } from '@/hooks/useRangeTasks'
-import type { RunConfig, Task } from '@/types/range'
+import type { RunConfig, Task, TaskCategory } from '@/types/range'
 
 interface TasksPageProps {
   onNavigate: (id: string) => void
@@ -43,21 +42,18 @@ export function TasksPage({ onNavigate, onDirtyChange }: TasksPageProps) {
     currentCasePlan,
   } = useRangeTasks()
   const [activeTab, setActiveTab] = useState<TaskTab>('create')
+  const [taskCategoryTab, setTaskCategoryTab] = useState<TaskCategory>('scenario')
   const [step, setStep] = useState(draftProgress.step ?? 0)
   const [selectedTemplateId, setSelectedTemplateId] = useState(draftProgress.selectedTemplateId ?? '')
   const selectedMatch = selectedTemplateId ? defaultResourceMatches[selectedTemplateId] : undefined
-  const [environmentId, setEnvironmentId] = useState(
-    draftProgress.environmentId ?? selectedMatch?.environmentId ?? '',
-  )
+  const [environmentId, setEnvironmentId] = useState(draftProgress.environmentId ?? selectedMatch?.environmentId ?? '')
   const [agentId, setAgentId] = useState(draftProgress.agentId ?? selectedMatch?.agentId ?? '')
   const [modelId, setModelId] = useState(draftProgress.modelId ?? selectedMatch?.modelId ?? '')
   const [runConfig, setRunConfig] = useState<RunConfig>(draftProgress.runConfig ?? defaultRunConfig)
   const [starting, setStarting] = useState(false)
   const [saving, setSaving] = useState(false)
   const [saveState, setSaveState] = useState<SaveState>('saved')
-  const [notice, setNotice] = useState(
-    draftProgress.selectedTemplateId ? '已恢复上次未完成的任务配置。' : '',
-  )
+  const [notice, setNotice] = useState(draftProgress.selectedTemplateId ? '已恢复上次未完成的任务配置。' : '')
   const [confirmed, setConfirmed] = useState(false)
   const [startupStage, setStartupStage] = useState('')
   const [leaveDialogOpen, setLeaveDialogOpen] = useState(false)
@@ -74,13 +70,7 @@ export function TasksPage({ onNavigate, onDirtyChange }: TasksPageProps) {
   const configErrors = useMemo(() => validateRunConfig(runConfig), [runConfig])
   const configValid = Object.keys(configErrors).length === 0
   const resourceValid = Boolean(environment && agent && model)
-  const maxReachableStep = selectedTemplate
-    ? resourceValid
-      ? configValid
-        ? 3
-        : 2
-      : 1
-    : 0
+  const maxReachableStep = selectedTemplate ? (resourceValid ? (configValid ? 3 : 2) : 1) : 0
   const errorSteps = configValid ? [] : [2]
 
   useEffect(() => {
@@ -94,9 +84,7 @@ export function TasksPage({ onNavigate, onDirtyChange }: TasksPageProps) {
   }, [selectedTemplateId])
 
   useEffect(() => {
-    if (step > maxReachableStep) {
-      setStep(maxReachableStep)
-    }
+    if (step > maxReachableStep) setStep(maxReachableStep)
   }, [maxReachableStep, step])
 
   useEffect(() => {
@@ -107,14 +95,7 @@ export function TasksPage({ onNavigate, onDirtyChange }: TasksPageProps) {
     setSaveState('saving')
     const timer = window.setTimeout(() => {
       try {
-        setDraftProgress({
-          step,
-          selectedTemplateId,
-          environmentId,
-          agentId,
-          modelId,
-          runConfig,
-        })
+        setDraftProgress({ step, selectedTemplateId, environmentId, agentId, modelId, runConfig })
         setSaveState('saved')
       } catch {
         setSaveState('failed')
@@ -145,15 +126,18 @@ export function TasksPage({ onNavigate, onDirtyChange }: TasksPageProps) {
   }
 
   const selectTemplate = (taskId: string) => {
+    const template = taskTemplates.find((item) => item.id === taskId)
+    if (!template?.runnable) {
+      setNotice('该任务为 Mock 预留卡片，本阶段暂不接入创建流程。')
+      return
+    }
     const match = defaultResourceMatches[taskId]
+    if (!match) return
     setSelectedTemplateId(taskId)
     setEnvironmentId(match.environmentId)
     setAgentId(match.agentId)
     setModelId(match.modelId)
-    setRunConfig((current) => ({
-      ...current,
-      runName: taskTemplates.find((item) => item.id === taskId)?.name ?? current.runName,
-    }))
+    setRunConfig((current) => ({ ...current, runName: template.name }))
     markChanged()
   }
 
@@ -195,7 +179,7 @@ export function TasksPage({ onNavigate, onDirtyChange }: TasksPageProps) {
   }
 
   const handleEdit = (task: Task) => {
-    const match = defaultResourceMatches[task.templateId]
+    const match = defaultResourceMatches[task.templateId] ?? defaultResourceMatches['enterprise-lateral']
     setActiveTab('create')
     setSelectedTemplateId(task.templateId)
     setEnvironmentId(match.environmentId)
@@ -218,14 +202,6 @@ export function TasksPage({ onNavigate, onDirtyChange }: TasksPageProps) {
     starting ||
     saving
 
-  const handleExitCreate = () => {
-    if (dirty) {
-      setLeaveDialogOpen(true)
-      return
-    }
-    setActiveTab('list')
-  }
-
   const selectedDefaultMatch = selectedTemplate ? defaultResourceMatches[selectedTemplate.id] : undefined
   const recommendedEnvironment =
     rangeEnvironments.find((item) => item.id === selectedDefaultMatch?.environmentId) ?? rangeEnvironments[0]
@@ -239,24 +215,16 @@ export function TasksPage({ onNavigate, onDirtyChange }: TasksPageProps) {
       <div className="mx-auto max-w-[1680px] space-y-5 pb-8">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
-            <div className="mb-2 flex items-center gap-2">
-              <Badge variant="outline">
-                <ClipboardList className="h-3.5 w-3.5" />
-                Task Center
-              </Badge>
-            </div>
-            <h1 className="text-2xl font-semibold tracking-tight text-[var(--color-ink)]">
-              评测任务中心
-            </h1>
+            <Badge variant="outline">
+              <ClipboardList className="h-3.5 w-3.5" />
+              Task Center
+            </Badge>
+            <h1 className="mt-2 text-2xl font-semibold tracking-tight text-[var(--color-ink)]">评测任务中心</h1>
             <p className="mt-1 text-sm text-[var(--color-ink-secondary)]">
-              选择任务、配置环境与智能体，创建一次可复现的攻防演练
+              选择任务、配置环境与智能体，创建一次可复现的攻防或 Benchmark 评测。
             </p>
           </div>
-          {notice ? (
-            <div className="rounded-lg border border-[var(--color-border)] bg-white px-3 py-2 text-sm text-[var(--color-success)] shadow-[var(--shadow-card)]">
-              {notice}
-            </div>
-          ) : null}
+          {notice ? <div className="rounded-lg border border-[var(--color-border)] bg-white px-3 py-2 text-sm text-[var(--color-success)] shadow-[var(--shadow-card)]">{notice}</div> : null}
         </div>
 
         <div className="flex w-fit rounded-lg border border-[var(--color-border)] bg-white p-1">
@@ -273,35 +241,34 @@ export function TasksPage({ onNavigate, onDirtyChange }: TasksPageProps) {
         {activeTab === 'create' ? (
           <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_360px]">
             <div className="min-w-0 space-y-4">
-              <TaskStepper
-                currentStep={step}
-                maxReachableStep={maxReachableStep}
-                errorSteps={errorSteps}
-                onStepClick={goStep}
-              />
+              <TaskStepper currentStep={step} maxReachableStep={maxReachableStep} errorSteps={errorSteps} onStepClick={goStep} />
 
               {step === 0 ? (
-                <div className="grid gap-4 md:grid-cols-2 2xl:grid-cols-4">
-                  {taskTemplates.map((task) => {
-                    const match = defaultResourceMatches[task.id]
-                    const cardEnvironment =
-                      rangeEnvironments.find((item) => item.id === match.environmentId) ?? rangeEnvironments[0]
-                    const cardAgent =
-                      agentProfiles.find((item) => item.id === match.agentId) ?? agentProfiles[0]
-                    const cardModel =
-                      modelProfiles.find((item) => item.id === match.modelId) ?? modelProfiles[0]
-                    return (
-                      <TaskCard
-                        key={task.id}
-                        task={task}
-                        selected={task.id === selectedTemplateId}
-                        recommendedEnvironment={cardEnvironment}
-                        recommendedAgent={cardAgent}
-                        recommendedModel={cardModel}
-                        onSelect={() => selectTemplate(task.id)}
-                      />
-                    )
-                  })}
+                <div className="space-y-4">
+                  <div className="grid gap-3 md:grid-cols-2">
+                    <TaskCategoryButton active={taskCategoryTab === 'scenario'} title="场景演练" description="在真实或仿真的多节点网络环境中评测黑盒、灰盒和长程攻防能力" onClick={() => setTaskCategoryTab('scenario')} />
+                    <TaskCategoryButton active={taskCategoryTab === 'benchmark'} title="Benchmark 评测" description="标准化评测漏洞挖掘、漏洞利用和漏洞修复 Agent 的能力" onClick={() => setTaskCategoryTab('benchmark')} />
+                  </div>
+                  <div className="grid gap-4 md:grid-cols-2 2xl:grid-cols-3">
+                    {taskTemplates.filter((task) => task.category === taskCategoryTab).map((task) => {
+                      const match = defaultResourceMatches[task.id] ?? defaultResourceMatches['enterprise-lateral']
+                      const cardEnvironment = rangeEnvironments.find((item) => item.id === match.environmentId) ?? rangeEnvironments[0]
+                      const cardAgent = agentProfiles.find((item) => item.id === match.agentId) ?? agentProfiles[0]
+                      const cardModel = modelProfiles.find((item) => item.id === match.modelId) ?? modelProfiles[0]
+                      return (
+                        <TaskCard
+                          key={task.id}
+                          task={task}
+                          selected={task.id === selectedTemplateId}
+                          recommendedEnvironment={cardEnvironment}
+                          recommendedAgent={cardAgent}
+                          recommendedModel={cardModel}
+                          disabled={task.runnable === false}
+                          onSelect={() => selectTemplate(task.id)}
+                        />
+                      )
+                    })}
+                  </div>
                 </div>
               ) : null}
 
@@ -357,7 +324,7 @@ export function TasksPage({ onNavigate, onDirtyChange }: TasksPageProps) {
                 starting={starting}
                 confirmed={confirmed}
                 nextDisabled={nextDisabled}
-                onExit={handleExitCreate}
+                onExit={() => (dirty ? setLeaveDialogOpen(true) : setActiveTab('list'))}
                 onSaveDraft={handleSaveDraft}
                 onBack={() => setStep(Math.max(0, step - 1))}
                 onNext={() => setStep(Math.min(3, step + 1))}
@@ -421,27 +388,37 @@ function validateRunConfig(value: RunConfig): RunConfigErrors {
   return errors
 }
 
-function TabButton({
+function TabButton({ active, onClick, children }: { active: boolean; onClick: () => void; children: ReactNode }) {
+  return (
+    <button
+      type="button"
+      className={cn('flex h-9 items-center gap-2 rounded-md px-3 text-sm font-medium', active ? 'bg-[var(--color-brand)] text-white' : 'text-[var(--color-ink-secondary)] hover:bg-[var(--color-brand-soft)]')}
+      onClick={onClick}
+    >
+      {children}
+    </button>
+  )
+}
+
+function TaskCategoryButton({
   active,
+  title,
+  description,
   onClick,
-  children,
 }: {
   active: boolean
+  title: string
+  description: string
   onClick: () => void
-  children: ReactNode
 }) {
   return (
     <button
       type="button"
-      className={cn(
-        'flex h-9 items-center gap-2 rounded-md px-3 text-sm font-medium',
-        active
-          ? 'bg-[var(--color-brand)] text-white'
-          : 'text-[var(--color-ink-secondary)] hover:bg-[var(--color-brand-soft)]',
-      )}
       onClick={onClick}
+      className={cn('rounded-lg border p-4 text-left transition', active ? 'border-[var(--color-brand)] bg-[var(--color-brand-soft)] text-[var(--color-brand)]' : 'border-[var(--color-border)] bg-white text-[var(--color-ink-secondary)] hover:border-[var(--color-brand)]/50')}
     >
-      {children}
+      <div className="text-base font-semibold">{title}</div>
+      <div className="mt-1 text-sm leading-6">{description}</div>
     </button>
   )
 }
@@ -473,9 +450,7 @@ function BottomActionBar({
     <div className="sticky bottom-4 z-10 rounded-xl border border-[var(--color-border)] bg-white/95 p-3 shadow-[var(--shadow-panel)] backdrop-blur">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex gap-2">
-          <Button variant="secondary" onClick={step === 3 ? onBack : onExit}>
-            {step === 3 ? '返回修改' : '退出创建'}
-          </Button>
+          <Button variant="secondary" onClick={step === 3 ? onBack : onExit}>{step === 3 ? '返回修改' : '退出创建'}</Button>
           <Button variant="outline" onClick={onSaveDraft} disabled={saving || starting}>
             {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
             保存草稿
@@ -484,12 +459,8 @@ function BottomActionBar({
         <div className="flex gap-2">
           {step < 3 ? (
             <>
-              <Button variant="secondary" disabled={step === 0 || saving || starting} onClick={onBack}>
-                上一步
-              </Button>
-              <Button disabled={nextDisabled} onClick={onNext}>
-                下一步
-              </Button>
+              <Button variant="secondary" disabled={step === 0 || saving || starting} onClick={onBack}>上一步</Button>
+              <Button disabled={nextDisabled} onClick={onNext}>下一步</Button>
             </>
           ) : (
             <Button disabled={!confirmed || starting || nextDisabled} onClick={onStart}>

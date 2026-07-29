@@ -1,11 +1,26 @@
 export type TaskStatus = 'draft' | 'configured' | 'running' | 'completed'
+export type TaskCategory = 'scenario' | 'benchmark'
 
 export interface TaskTemplate {
   id: string
+  category: TaskCategory
   name: string
   type: string
   environmentKind: string
   benchmark?: string
+  benchmarkName?: string
+  evaluationTarget: string
+  paradigm?: string
+  isWhiteBox?: boolean
+  providesSource?: boolean
+  requiresPoc?: boolean
+  requiresPatch?: boolean
+  runsFunctionalTests?: boolean
+  runsSecurityTests?: boolean
+  nodeCount?: string
+  networkZones?: string
+  scoringMethod: string
+  runnable?: boolean
   difficulty: string
   objective: string
   estimatedDuration: string

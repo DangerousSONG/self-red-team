@@ -1,15 +1,21 @@
-import { FileText, LayoutDashboard, Network, type LucideIcon } from 'lucide-react'
+import { BarChart3, Database, FileText, LayoutDashboard, Network, PlayCircle, type LucideIcon } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useRangeTasks } from '@/hooks/useRangeTasks'
 
 const stageNavItems = [
   { id: 'home', label: '运行总览', icon: 'LayoutDashboard' },
   { id: 'tasks', label: '评测任务', icon: 'FileText' },
+  { id: 'rangerun', label: 'RangeRun', icon: 'PlayCircle' },
+  { id: 'results', label: '评分结果', icon: 'BarChart3' },
+  { id: 'data-center', label: '数据中心', icon: 'Database' },
 ] as const
 
 const iconMap: Record<string, LucideIcon> = {
   LayoutDashboard,
   FileText,
+  PlayCircle,
+  BarChart3,
+  Database,
 }
 
 interface SidebarProps {
@@ -20,6 +26,12 @@ interface SidebarProps {
 export function Sidebar({ activeId, onNavigate }: SidebarProps) {
   const { currentRun, draftProgress } = useRangeTasks()
 
+  const activeGroup = activeId.startsWith('result') || activeId === 'run-data'
+    ? 'results'
+    : activeId.startsWith('trajectory') || activeId.startsWith('cpt') || activeId.startsWith('vulnerability')
+      ? 'data-center'
+      : activeId
+
   return (
     <aside className="flex h-screen w-[220px] shrink-0 flex-col bg-[#0f2744] text-white">
       <div className="border-b border-white/10 px-4 py-5">
@@ -28,7 +40,7 @@ export function Sidebar({ activeId, onNavigate }: SidebarProps) {
             <Network className="h-4 w-4" strokeWidth={2.2} />
           </div>
           <div>
-            <div className="text-[13px] font-semibold tracking-tight">AI安全靶场</div>
+            <div className="text-[13px] font-semibold tracking-tight">AI 安全面场</div>
             <div className="font-mono text-[10px] uppercase tracking-[0.14em] text-white/50">
               Cyber Range Console
             </div>
@@ -40,7 +52,7 @@ export function Sidebar({ activeId, onNavigate }: SidebarProps) {
         <ul className="space-y-0.5">
           {stageNavItems.map((item) => {
             const Icon = iconMap[item.icon]
-            const active = activeId === item.id
+            const active = activeGroup === item.id
             return (
               <li key={item.id}>
                 <button
@@ -65,11 +77,11 @@ export function Sidebar({ activeId, onNavigate }: SidebarProps) {
       <div className="space-y-2 border-t border-white/10 p-3">
         <button
           type="button"
-          onClick={() => onNavigate('home')}
+          onClick={() => onNavigate('rangerun')}
           className="w-full rounded-lg border border-white/10 bg-white/5 p-3 text-left transition hover:bg-white/10"
         >
           <div className="font-mono text-[10px] uppercase tracking-[0.14em] text-white/45">
-            当前运行
+            当前演练
           </div>
           {currentRun ? (
             <>
@@ -77,8 +89,8 @@ export function Sidebar({ activeId, onNavigate }: SidebarProps) {
                 {currentRun.taskName}
               </div>
               <div className="mt-2 flex items-center gap-1.5 text-[11px] text-emerald-300">
-                <span className="status-pulse h-1.5 w-1.5 rounded-full bg-emerald-400" />
-                RangeRun · {currentRun.status}
+                <span className={cn('h-1.5 w-1.5 rounded-full bg-emerald-400', currentRun.status === 'Running' && 'status-pulse')} />
+                RangeRun / {currentRun.status}
               </div>
               <div className="mt-1 font-mono text-[10px] text-white/40">{currentRun.id}</div>
             </>
@@ -93,7 +105,7 @@ export function Sidebar({ activeId, onNavigate }: SidebarProps) {
               正在创建
             </div>
             <div className="mt-1.5 text-[12px] font-medium leading-snug text-white">
-              新 CasePlan · Step {(draftProgress.step ?? 0) + 1}/4
+              新 CasePlan / Step {(draftProgress.step ?? 0) + 1}/4
             </div>
           </div>
         ) : null}

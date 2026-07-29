@@ -12,11 +12,25 @@ import {
 } from '@/components/ui/dialog'
 import { DashboardPage } from '@/pages/DashboardPage'
 import { TasksPage } from '@/pages/TasksPage'
+import { ResultsPage } from '@/pages/ResultsPage'
+import { ResultDetailPage } from '@/pages/ResultDetailPage'
+import { RunDataDispositionPage } from '@/pages/RunDataDispositionPage'
+import { DataCenterPage } from '@/pages/DataCenterPage'
+import { TrajectoryDatasetsPage } from '@/pages/TrajectoryDatasetsPage'
+import { TrajectoryDatasetDetailPage } from '@/pages/TrajectoryDatasetDetailPage'
+import { CptCorpusPage } from '@/pages/CptCorpusPage'
+import { CptCorpusDetailPage } from '@/pages/CptCorpusDetailPage'
+import { VulnerabilityDataPage } from '@/pages/VulnerabilityDataPage'
+import { VulnerabilityDetailPage } from '@/pages/VulnerabilityDetailPage'
 
 export default function App() {
   const [activeId, setActiveId] = useState('home')
   const [tasksDirty, setTasksDirty] = useState(false)
   const [pendingNavId, setPendingNavId] = useState<string | null>(null)
+  const [selectedRunId, setSelectedRunId] = useState('')
+  const [selectedDatasetId, setSelectedDatasetId] = useState('')
+  const [selectedCorpusId, setSelectedCorpusId] = useState('')
+  const [selectedVulnerabilityId, setSelectedVulnerabilityId] = useState('')
 
   const handleNavigate = (id: string) => {
     if (activeId === 'tasks' && id !== 'tasks' && tasksDirty) {
@@ -24,6 +38,31 @@ export default function App() {
       return
     }
     setActiveId(id)
+  }
+
+  const openResult = (runId: string) => {
+    setSelectedRunId(runId)
+    handleNavigate('result-detail')
+  }
+
+  const processRunData = (runId: string) => {
+    setSelectedRunId(runId)
+    handleNavigate('run-data')
+  }
+
+  const openDataset = (datasetId: string) => {
+    setSelectedDatasetId(datasetId)
+    handleNavigate('trajectory-detail')
+  }
+
+  const openCorpus = (id: string) => {
+    setSelectedCorpusId(id)
+    handleNavigate('cpt-detail')
+  }
+
+  const openVulnerability = (uuid: string) => {
+    setSelectedVulnerabilityId(uuid)
+    handleNavigate('vulnerability-detail')
   }
 
   const leaveTasks = (saveDraft: boolean) => {
@@ -35,22 +74,66 @@ export default function App() {
     setPendingNavId(null)
   }
 
+  const renderPage = () => {
+    if (activeId === 'home' || activeId === 'rangerun') {
+      return (
+        <>
+          <Header onNavigate={handleNavigate} onOpenResult={openResult} />
+          <DashboardPage onNavigate={handleNavigate} />
+        </>
+      )
+    }
+
+    if (activeId === 'tasks') {
+      return (
+        <ErrorBoundary>
+          <TasksPage onNavigate={handleNavigate} onDirtyChange={setTasksDirty} />
+        </ErrorBoundary>
+      )
+    }
+
+    if (activeId === 'results') {
+      return <ResultsPage onOpenResult={openResult} onProcessData={processRunData} onNavigate={handleNavigate} />
+    }
+
+    if (activeId === 'result-detail') {
+      return (
+        <ResultDetailPage
+          runId={selectedRunId}
+          onNavigate={handleNavigate}
+          onProcessData={processRunData}
+          onOpenDataset={openDataset}
+        />
+      )
+    }
+
+    if (activeId === 'run-data') {
+      return (
+        <RunDataDispositionPage
+          runId={selectedRunId}
+          onBackResult={openResult}
+          onOpenDataset={openDataset}
+          onNavigate={handleNavigate}
+        />
+      )
+    }
+
+    if (activeId === 'data-center') return <DataCenterPage onNavigate={handleNavigate} />
+    if (activeId === 'trajectories') return <TrajectoryDatasetsPage onOpenDataset={openDataset} />
+    if (activeId === 'trajectory-detail') return <TrajectoryDatasetDetailPage datasetId={selectedDatasetId} onNavigate={handleNavigate} />
+    if (activeId === 'cpt') return <CptCorpusPage onOpenCorpus={openCorpus} />
+    if (activeId === 'cpt-detail') return <CptCorpusDetailPage id={selectedCorpusId} onNavigate={handleNavigate} />
+    if (activeId === 'vulnerabilities') return <VulnerabilityDataPage onOpenVulnerability={openVulnerability} />
+    if (activeId === 'vulnerability-detail') return <VulnerabilityDetailPage uuid={selectedVulnerabilityId} onNavigate={handleNavigate} />
+
+    return <DataCenterPage onNavigate={handleNavigate} />
+  }
+
   return (
     <>
       <div className="flex min-h-screen">
         <Sidebar activeId={activeId} onNavigate={handleNavigate} />
-        <div className="flex min-w-0 flex-1 flex-col">
-          {activeId === 'home' ? (
-            <>
-              <Header onNavigate={handleNavigate} />
-              <DashboardPage onNavigate={handleNavigate} />
-            </>
-          ) : (
-            <ErrorBoundary>
-              <TasksPage onNavigate={handleNavigate} onDirtyChange={setTasksDirty} />
-            </ErrorBoundary>
-          )}
-        </div>
+        <div className="flex min-w-0 flex-1 flex-col">{renderPage()}</div>
       </div>
 
       <Dialog open={Boolean(pendingNavId)} onOpenChange={(open) => !open && setPendingNavId(null)}>
