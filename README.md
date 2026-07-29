@@ -1,17 +1,41 @@
-# AI安全靶场 · Cyber Range Console
+# AI 安全靶场 · Cyber Range Console
 
-面向研究员、安全专家、CI/CD 与安全运维的 AI Agent 攻防演练控制台。
+面向 AI Agent 安全评测的本地 Mock 控制台，用于演示从评测任务创建到 RangeRun 运行总览的最小闭环。
 
-## 能力闭环
+## 本阶段新增
 
-场景 + Agent + 模型 + 预算 → CasePlan → RangeRun → 隔离环境 → Agent 执行 → 取证 → 销毁 → 离线评分
+- 评测任务中心：左侧导航点击“评测任务”进入。
+- 创建任务流程：选择任务、匹配资源、运行配置、确认启动四步 Stepper。
+- 任务列表：展示本地 Mock 任务，支持编辑、启动、查看运行和复制。
+- Dashboard 联动：启动 Mock 任务后自动进入运行总览，并展示当前任务、Run ID、环境、Agent、模型和状态。
+- 本地状态保留：任务列表、当前 Run、当前 CasePlan 和创建进度会保存到 localStorage。
+
+## 操作流程
+
+1. 进入“评测任务”。
+2. 在“创建任务”Tab 中选择一个 Mock 任务模板。
+3. 查看或切换推荐靶场环境、Agent 和模型。
+4. 填写运行名称、超时、Token 预算、成本预算、并发数和最大步骤数。
+5. 在确认页保存草稿，或点击“确认并启动”。
+6. 启动后自动返回“运行总览”，查看当前 Mock RangeRun。
+7. 在 Dashboard 顶部点击“停止任务”可将当前 Run 状态改为 Stopped。
+
+## Mock 数据
+
+Mock 数据统一放在 `src/lib/mock-data/`：
+
+- `tasks.ts`：任务模板和任务列表。
+- `resources.ts`：靶场环境、Agent、模型和默认匹配规则。
+- `runs.ts`：示例 RangeRun 数据。
+
+类型定义放在 `src/types/range.ts`，包含 `Task`、`CasePlan`、`RangeRun`、`AgentProfile`、`ModelProfile` 和 `RangeEnvironment`。
 
 ## 技术栈
 
 - React + TypeScript
 - Tailwind CSS
-- shadcn/ui 风格组件
-- React Flow（网络拓扑）
+- Vite
+- React Flow
 
 ## 启动
 
@@ -20,11 +44,9 @@ npm install
 npm run dev
 ```
 
-## 首页模块
+## 验证
 
-1. 当前演练概览
-2. RangeRun Lifecycle
-3. Runtime Environment（可点击拓扑节点）
-4. Agent Trace
-5. Evidence & Scoring
-6. Run Timeline 侧栏
+```bash
+npm run lint
+npm run build
+```
