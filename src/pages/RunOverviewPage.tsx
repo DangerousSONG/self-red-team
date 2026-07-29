@@ -38,6 +38,7 @@ interface RunOverviewPageProps {
 }
 
 type FilterKey = 'all' | PlatformTaskType | 'abnormal'
+type ViewMode = 'card' | 'list'
 type AssetItem = {
   id: string
   name: string
@@ -75,7 +76,8 @@ export function RunOverviewPage({
   const { focus, focusTask } = usePlatformFocus()
   const [filter, setFilter] = useState<FilterKey>('all')
   const [search, setSearch] = useState('')
-  const [expanded, setExpanded] = useState(false)
+  const [view, setView] = useState<ViewMode>('card')
+  const [page, setPage] = useState(1)
 
   useEffect(() => {
     const timer = window.setInterval(() => {
@@ -110,7 +112,10 @@ export function RunOverviewPage({
       return matchedFilter && matchedSearch
     })
   }, [filter, platformTasks, search])
-  const visibleTasks = expanded ? filteredTasks : filteredTasks.slice(0, 6)
+  const pageSize = view === 'card' ? 6 : 8
+  const totalPages = Math.max(1, Math.ceil(filteredTasks.length / pageSize))
+  const currentPage = Math.min(page, totalPages)
+  const visibleTasks = filteredTasks.slice((currentPage - 1) * pageSize, currentPage * pageSize)
   const latestAssets = useMemo(
     () =>
       buildLatestAssets({
@@ -138,6 +143,10 @@ export function RunOverviewPage({
       vulnerabilityDatasets,
     ],
   )
+
+  useEffect(() => {
+    setPage(1)
+  }, [filter, search, view])
 
   const openTask = (task: PlatformTaskSummary) => {
     focusTask(task.id, task.type)
@@ -230,14 +239,20 @@ export function RunOverviewPage({
               <h2 className="text-lg font-semibold">平台任务态势</h2>
               <p className="mt-1 text-sm text-[var(--color-ink-secondary)]">从这里进入具体 RangeRun 或基模训练实例。</p>
             </div>
-            <div className="relative">
-              <Search className="pointer-events-none absolute left-2.5 top-2.5 h-4 w-4 text-[var(--color-ink-muted)]" />
-              <input
-                className="h-9 w-[260px] rounded-md border border-[var(--color-border-strong)] bg-white pl-8 pr-3 text-sm"
-                placeholder="搜索任务名称、Run ID 或 Training ID"
-                value={search}
-                onChange={(event) => setSearch(event.target.value)}
-              />
+            <div className="flex flex-wrap items-center gap-2">
+              <div className="flex rounded-lg border border-[var(--color-border)] bg-white p-1">
+                <SmallToggle active={view === 'card'} onClick={() => setView('card')}>卡片视图</SmallToggle>
+                <SmallToggle active={view === 'list'} onClick={() => setView('list')}>列表视图</SmallToggle>
+              </div>
+              <div className="relative">
+                <Search className="pointer-events-none absolute left-2.5 top-2.5 h-4 w-4 text-[var(--color-ink-muted)]" />
+                <input
+                  className="h-9 w-[260px] rounded-md border border-[var(--color-border-strong)] bg-white pl-8 pr-3 text-sm"
+                  placeholder="搜索任务名称、Run ID 或 Training ID"
+                  value={search}
+                  onChange={(event) => setSearch(event.target.value)}
+                />
+              </div>
             </div>
           </div>
 
@@ -259,7 +274,7 @@ export function RunOverviewPage({
             ))}
           </div>
 
-          {filteredTasks.length ? (
+          {filteredTasks.length && view === 'card' ? (
             <div className="grid gap-4 lg:grid-cols-2 2xl:grid-cols-3">
               {visibleTasks.map((task) => (
                 <PlatformTaskCard
@@ -274,6 +289,17 @@ export function RunOverviewPage({
                 />
               ))}
             </div>
+          ) : filteredTasks.length ? (
+            <PlatformTaskTable
+              tasks={visibleTasks}
+              focusedTaskId={focus?.id}
+              focusedTaskType={focus?.type}
+              onFocus={(task) => {
+                focusTask(task.id, task.type)
+                if (task.runId) setFocusedRun(task.runId)
+              }}
+              onOpen={openTask}
+            />
           ) : (
             <Card>
               <CardContent className="p-8 text-center text-sm text-[var(--color-ink-secondary)]">
@@ -282,10 +308,14 @@ export function RunOverviewPage({
             </Card>
           )}
 
-          {filteredTasks.length > 6 ? (
-            <Button variant="secondary" onClick={() => setExpanded((value) => !value)}>
-              {expanded ? '收起任务' : '查看全部任务'}
-            </Button>
+          {filteredTasks.length ? (
+            <Pagination
+              page={currentPage}
+              totalPages={totalPages}
+              total={filteredTasks.length}
+              pageSize={pageSize}
+              onPageChange={setPage}
+            />
           ) : null}
         </section>
 
@@ -412,6 +442,71 @@ function PlatformTaskCard({
   )
 }
 
+function PlatformTaskTable({
+  tasks,
+  focusedTaskId,
+  focusedTaskType,
+  onFocus,
+  onOpen,
+}: {
+  tasks: PlatformTaskSummary[]
+  focusedTaskId?: string
+  focusedTaskType?: PlatformTaskType
+  onFocus: (task: PlatformTaskSummary) => void
+  onOpen: (task: PlatformTaskSummary) => void
+}) {
+  return (
+    <Card>
+      <CardContent className="overflow-x-auto p-0">
+        <table className="w-full min-w-[1120px] text-left text-sm">
+          <thead className="bg-[var(--color-surface-muted)] text-xs text-[var(--color-ink-muted)]">
+            <tr>
+              {['ID', '任务名称', '类型', '状态', '当前阶段', '进度', '主体', '环境 / 数据', '已运行', '最近更新', '操作'].map((head) => (
+                <th key={head} className="px-3 py-2 font-semibold">{head}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {tasks.map((task) => {
+              const focused = focusedTaskId === task.id && focusedTaskType === task.type
+              return (
+                <tr key={`${task.type}-${task.id}`} className={cn('border-t border-[var(--color-border)]', focused && 'bg-[var(--color-brand-soft)]')}>
+                  <td className="px-3 py-3 font-mono text-xs">{task.runId ?? task.trainingJobId}</td>
+                  <td className="px-3 py-3">
+                    <div className="font-semibold">{task.name}</div>
+                    <div className="mt-1 max-w-[280px] truncate text-xs text-[var(--color-ink-muted)]">{task.stageDescription ?? '-'}</div>
+                  </td>
+                  <td className="px-3 py-3"><Badge variant="outline" className={typeBadgeClass(task.type)}>{typeText(task.type)}</Badge></td>
+                  <td className="px-3 py-3"><StatusBadge status={task.status} /></td>
+                  <td className="px-3 py-3">{task.currentStage}</td>
+                  <td className="px-3 py-3">
+                    <div className="flex w-32 items-center gap-2">
+                      <ProgressBar value={task.progress} />
+                      <span className="w-9 text-xs font-semibold">{task.progress}%</span>
+                    </div>
+                  </td>
+                  <td className="px-3 py-3">{task.type === 'base_model_training' ? task.model ?? '-' : task.agent ?? '-'}</td>
+                  <td className="px-3 py-3">{task.type === 'base_model_training' ? compactList(task.datasetNames) : task.environment ?? '-'}</td>
+                  <td className="px-3 py-3">{task.elapsedSeconds ? formatDuration(task.elapsedSeconds) : '-'}</td>
+                  <td className="px-3 py-3">{task.updatedAt}</td>
+                  <td className="px-3 py-3">
+                    <div className="flex flex-wrap gap-1.5">
+                      <Button size="sm" variant="secondary" onClick={() => onOpen(task)}>
+                        {task.type === 'base_model_training' ? '查看训练' : '进入'}
+                      </Button>
+                      <Button size="sm" variant="ghost" onClick={() => onFocus(task)}>关注</Button>
+                    </div>
+                  </td>
+                </tr>
+              )
+            })}
+          </tbody>
+        </table>
+      </CardContent>
+    </Card>
+  )
+}
+
 function RecentResults({
   results,
   onNavigate,
@@ -504,6 +599,65 @@ function RecentAssets({ assets }: { assets: AssetItem[] }) {
         ))}
       </CardContent>
     </Card>
+  )
+}
+
+function SmallToggle({ active, onClick, children }: { active: boolean; onClick: () => void; children: ReactNode }) {
+  return (
+    <button
+      type="button"
+      className={cn(
+        'rounded-md px-3 py-1.5 text-sm font-medium transition-colors',
+        active ? 'bg-[var(--color-brand)] text-white' : 'text-[var(--color-ink-secondary)] hover:bg-[var(--color-brand-soft)]',
+      )}
+      onClick={onClick}
+    >
+      {children}
+    </button>
+  )
+}
+
+function Pagination({
+  page,
+  totalPages,
+  total,
+  pageSize,
+  onPageChange,
+}: {
+  page: number
+  totalPages: number
+  total: number
+  pageSize: number
+  onPageChange: (page: number) => void
+}) {
+  const start = total === 0 ? 0 : (page - 1) * pageSize + 1
+  const end = Math.min(total, page * pageSize)
+  const pages = Array.from({ length: totalPages }, (_, index) => index + 1)
+  return (
+    <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-[var(--color-border)] bg-white px-3 py-2">
+      <div className="text-sm text-[var(--color-ink-secondary)]">
+        显示 {start}-{end} / 共 {total} 个任务
+      </div>
+      <div className="flex flex-wrap items-center gap-1">
+        <Button size="sm" variant="secondary" disabled={page <= 1} onClick={() => onPageChange(page - 1)}>上一页</Button>
+        {pages.map((item) => (
+          <button
+            key={item}
+            type="button"
+            className={cn(
+              'h-8 min-w-8 rounded-md border px-2 text-sm font-medium',
+              item === page
+                ? 'border-[var(--color-brand)] bg-[var(--color-brand)] text-white'
+                : 'border-[var(--color-border)] bg-white text-[var(--color-ink-secondary)] hover:bg-[var(--color-brand-soft)]',
+            )}
+            onClick={() => onPageChange(item)}
+          >
+            {item}
+          </button>
+        ))}
+        <Button size="sm" variant="secondary" disabled={page >= totalPages} onClick={() => onPageChange(page + 1)}>下一页</Button>
+      </div>
+    </div>
   )
 }
 
