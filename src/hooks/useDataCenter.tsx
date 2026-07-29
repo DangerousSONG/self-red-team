@@ -88,6 +88,7 @@ interface DataCenterContextValue extends DataCenterState {
   createTrainingJob: (input: CreateTrainingJobInput) => TrainingJob
   startTrainingJob: (jobId: string) => void
   stopTrainingJob: (jobId: string) => void
+  deleteTrainingJob: (jobId: string) => void
   advanceTrainingJob: (jobId: string) => void
   appendTrainingMetric: (jobId: string) => void
   createCheckpoint: (jobId: string) => void
@@ -689,6 +690,15 @@ export function DataCenterProvider({ children }: { children: ReactNode }) {
     }))
   }, [])
 
+  const deleteTrainingJob = useCallback((jobId: string) => {
+    setState((current) => ({
+      ...current,
+      trainingJobs: current.trainingJobs.filter((job) => job.id !== jobId),
+      trainingLogs: current.trainingLogs.filter((log) => log.trainingJobId !== jobId),
+      checkpoints: current.checkpoints.filter((checkpoint) => checkpoint.trainingJobId !== jobId),
+    }))
+  }, [])
+
   const appendTrainingMetric = useCallback((jobId: string) => {
     setState((current) => ({
       ...current,
@@ -809,6 +819,7 @@ export function DataCenterProvider({ children }: { children: ReactNode }) {
       createTrainingJob,
       startTrainingJob,
       stopTrainingJob,
+      deleteTrainingJob,
       advanceTrainingJob,
       appendTrainingMetric,
       createCheckpoint,
@@ -830,6 +841,7 @@ export function DataCenterProvider({ children }: { children: ReactNode }) {
       createTrainingJob,
       startTrainingJob,
       stopTrainingJob,
+      deleteTrainingJob,
       advanceTrainingJob,
       appendTrainingMetric,
       createCheckpoint,

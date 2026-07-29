@@ -50,6 +50,7 @@ export default function App() {
   const [selectedVulnerabilityDatasetId, setSelectedVulnerabilityDatasetId] = useState('')
   const [selectedBenchmarkDatasetId, setSelectedBenchmarkDatasetId] = useState('')
   const [selectedTrainingJobId, setSelectedTrainingJobId] = useState('')
+  const [selectedTrainingSection, setSelectedTrainingSection] = useState<'overview' | 'data' | 'artifact'>('overview')
   const [selectedArtifactId, setSelectedArtifactId] = useState('')
   const [selectedModelId, setSelectedModelId] = useState('')
   const [selectedAgentId, setSelectedAgentId] = useState('')
@@ -118,8 +119,9 @@ export default function App() {
     handleNavigate('benchmark-detail')
   }
 
-  const openTrainingJob = (id: string) => {
+  const openTrainingJob = (id: string, section: 'overview' | 'data' | 'artifact' = 'overview') => {
     setSelectedTrainingJobId(id)
+    setSelectedTrainingSection(section)
     focusTask(id, 'base_model_training')
     handleNavigate('training-detail')
   }
@@ -234,8 +236,8 @@ export default function App() {
     if (activeId === 'model-detail') return <ModelDetailPage modelId={selectedModelId} onNavigate={handleNavigate} onOpenAgent={openAgent} onOpenArtifact={openArtifact} onOpenTrainingJob={openTrainingJob} />
     if (activeId === 'agents') return <AgentsPage onOpenAgent={openAgent} onOpenModel={openModel} onNavigate={handleNavigate} />
     if (activeId === 'agent-detail') return <AgentDetailPage agentId={selectedAgentId} onNavigate={handleNavigate} onOpenModel={openModel} />
-    if (activeId === 'training') return <TrainingJobsPage onOpenJob={openTrainingJob} onOpenArtifacts={() => handleNavigate('training-artifacts')} />
-    if (activeId === 'training-detail') return <TrainingJobDetailPage jobId={selectedTrainingJobId} onNavigate={handleNavigate} onOpenCpt={openCorpus} onOpenVulnerability={openVulnerabilityDataset} onOpenArtifact={openArtifact} />
+    if (activeId === 'training') return <TrainingJobsPage onOpenJob={openTrainingJob} onOpenArtifact={openArtifact} onOpenArtifacts={() => handleNavigate('training-artifacts')} />
+    if (activeId === 'training-detail') return <TrainingJobDetailPage jobId={selectedTrainingJobId} focusSection={selectedTrainingSection} onNavigate={handleNavigate} onOpenCpt={openCorpus} onOpenVulnerability={openVulnerabilityDataset} onOpenArtifact={openArtifact} />
     if (activeId === 'training-artifacts') return <ModelArtifactsPage onOpenArtifact={openArtifact} onOpenTraining={() => handleNavigate('training')} />
     if (activeId === 'artifact-detail') return <ModelArtifactDetailPage artifactId={selectedArtifactId} onNavigate={handleNavigate} onOpenJob={openTrainingJob} onOpenDataset={openArtifactDataset} onOpenModel={openModel} />
 

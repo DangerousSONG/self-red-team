@@ -10,6 +10,7 @@ import type { TrainingCheckpoint, TrainingMetricSeries } from '@/types/training'
 
 interface TrainingJobDetailPageProps {
   jobId: string
+  focusSection?: 'overview' | 'data' | 'artifact'
   onNavigate: (id: string) => void
   onOpenCpt: (id: string) => void
   onOpenVulnerability: (id: string) => void
@@ -23,7 +24,7 @@ const metricGroups = [
   { title: '训练效率', category: 'training_efficiency', keys: ['perf/wait_time_ratio', 'perf/train_wait_time'] },
 ] as const
 
-export function TrainingJobDetailPage({ jobId, onNavigate, onOpenCpt, onOpenVulnerability, onOpenArtifact }: TrainingJobDetailPageProps) {
+export function TrainingJobDetailPage({ jobId, focusSection = 'overview', onNavigate, onOpenCpt, onOpenVulnerability, onOpenArtifact }: TrainingJobDetailPageProps) {
   const {
     trainingJobs,
     checkpoints,
@@ -46,6 +47,14 @@ export function TrainingJobDetailPage({ jobId, onNavigate, onOpenCpt, onOpenVuln
     const timer = window.setInterval(() => advanceTrainingJob(job.id), 3200)
     return () => window.clearInterval(timer)
   }, [advanceTrainingJob, job.id, job.status])
+
+  useEffect(() => {
+    if (focusSection === 'overview') return
+    const timer = window.setTimeout(() => {
+      document.getElementById(`training-section-${focusSection}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    }, 80)
+    return () => window.clearTimeout(timer)
+  }, [focusSection, job.id])
 
   const showToast = (message: string) => {
     setToast(message)
@@ -129,7 +138,7 @@ export function TrainingJobDetailPage({ jobId, onNavigate, onOpenCpt, onOpenVuln
           </div>
         </Section>
 
-        <Section title="数据使用情况">
+        <Section id="training-section-data" title="数据使用情况">
           <div className="grid gap-4 xl:grid-cols-[1fr_360px]">
             <Card>
               <CardContent className="overflow-x-auto p-0">
@@ -209,7 +218,7 @@ export function TrainingJobDetailPage({ jobId, onNavigate, onOpenCpt, onOpenVuln
           </Card>
         </Section>
 
-        <Section title="模型产物">
+        <Section id="training-section-artifact" title="模型产物">
           {artifact ? (
             <Card>
               <CardContent className="flex flex-wrap items-center justify-between gap-3 p-4">
@@ -346,9 +355,9 @@ function Bar({ before, checkpoint, after }: { before: number; checkpoint: number
   )
 }
 
-function Section({ title, action, children }: { title: string; action?: React.ReactNode; children: React.ReactNode }) {
+function Section({ id, title, action, children }: { id?: string; title: string; action?: React.ReactNode; children: React.ReactNode }) {
   return (
-    <section className="space-y-3">
+    <section id={id} className="space-y-3 scroll-mt-5">
       <div className="flex items-center justify-between gap-3">
         <h2 className="text-lg font-semibold">{title}</h2>
         {action}

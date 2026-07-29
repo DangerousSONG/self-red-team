@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { Brain, Boxes, Database, Eye, ListChecks, PackageOpen, Square } from 'lucide-react'
+import { Brain, Boxes, Eye, ListChecks, PackageOpen, Square, Trash2 } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
@@ -8,12 +8,13 @@ import { useDataCenter } from '@/hooks/useDataCenter'
 import type { TrainingJob } from '@/types/training'
 
 interface TrainingJobsPageProps {
-  onOpenJob: (jobId: string) => void
+  onOpenJob: (jobId: string, section?: 'overview' | 'data' | 'artifact') => void
+  onOpenArtifact: (artifactId: string) => void
   onOpenArtifacts: () => void
 }
 
-export function TrainingJobsPage({ onOpenJob, onOpenArtifacts }: TrainingJobsPageProps) {
-  const { trainingJobs, modelArtifacts, stopTrainingJob } = useDataCenter()
+export function TrainingJobsPage({ onOpenJob, onOpenArtifact, onOpenArtifacts }: TrainingJobsPageProps) {
+  const { trainingJobs, modelArtifacts, stopTrainingJob, deleteTrainingJob } = useDataCenter()
   const [toast, setToast] = useState('')
   const stats = useMemo(() => ({
     total: trainingJobs.length,
@@ -70,6 +71,11 @@ export function TrainingJobsPage({ onOpenJob, onOpenArtifacts }: TrainingJobsPag
                     key={job.id}
                     job={job}
                     onOpenJob={onOpenJob}
+                    onOpenArtifact={onOpenArtifact}
+                    onDelete={() => {
+                      deleteTrainingJob(job.id)
+                      showToast('训练任务已删除')
+                    }}
                     onStop={() => {
                       stopTrainingJob(job.id)
                       showToast('任务已停止')
@@ -86,9 +92,22 @@ export function TrainingJobsPage({ onOpenJob, onOpenArtifacts }: TrainingJobsPag
   )
 }
 
-function JobRow({ job, onOpenJob, onStop }: { job: TrainingJob; onOpenJob: (jobId: string) => void; onStop: () => void }) {
+function JobRow({
+  job,
+  onOpenJob,
+  onOpenArtifact,
+  onDelete,
+  onStop,
+}: {
+  job: TrainingJob
+  onOpenJob: (jobId: string, section?: 'overview' | 'data' | 'artifact') => void
+  onOpenArtifact: (artifactId: string) => void
+  onDelete: () => void
+  onStop: () => void
+}) {
   const cptCount = job.datasets.filter((item) => item.datasetType === 'cpt').length
   const vulnCount = job.datasets.filter((item) => item.datasetType === 'vulnerability').length
+  const deletable = ['completed', 'failed', 'stopped'].includes(job.status)
   return (
     <tr className="border-t border-[var(--color-border)]">
       <td className="px-3 py-3 font-mono text-xs">{job.id}</td>
@@ -105,14 +124,16 @@ function JobRow({ job, onOpenJob, onStop }: { job: TrainingJob; onOpenJob: (jobI
       <td className="px-3 py-3">{job.createdAt}</td>
       <td className="px-3 py-3">
         <div className="flex items-center gap-1.5 whitespace-nowrap">
-          <Button size="sm" variant="secondary" onClick={() => onOpenJob(job.id)}>
+          <Button size="sm" variant="secondary" onClick={() => onOpenJob(job.id, 'overview')}>
             <Eye className="h-3.5 w-3.5" />
             详情
           </Button>
-          <Button size="sm" variant="ghost" onClick={() => onOpenJob(job.id)}>
-            <Database className="h-3.5 w-3.5" />
-            数据
-          </Button>
+          {deletable ? (
+            <Button size="sm" variant="ghost" className="text-[var(--color-danger)] hover:bg-red-50 hover:text-[var(--color-danger)]" onClick={onDelete}>
+              <Trash2 className="h-3.5 w-3.5" />
+              删除
+            </Button>
+          ) : null}
           {!['completed', 'failed', 'stopped'].includes(job.status) ? (
             <Button size="sm" variant="ghost" onClick={onStop}>
               <Square className="h-3.5 w-3.5" />
@@ -120,7 +141,7 @@ function JobRow({ job, onOpenJob, onStop }: { job: TrainingJob; onOpenJob: (jobI
             </Button>
           ) : null}
           {job.artifactId ? (
-            <Button size="sm" variant="ghost" onClick={() => onOpenJob(job.id)}>
+            <Button size="sm" variant="ghost" onClick={() => onOpenArtifact(job.artifactId!)}>
               <PackageOpen className="h-3.5 w-3.5" />
               产物
             </Button>
