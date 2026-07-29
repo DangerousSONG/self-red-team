@@ -22,7 +22,7 @@ const toneClass: Record<string, string> = {
 export function EvidenceScoring() {
   return (
     <Card>
-      <CardHeader className="pb-2 pt-4">
+      <CardHeader className="px-3.5 pb-2 pt-3.5">
         <div className="flex items-start justify-between gap-3">
           <div>
             <CardTitle className="text-base">证据与评分</CardTitle>
@@ -37,7 +37,7 @@ export function EvidenceScoring() {
         </div>
       </CardHeader>
 
-      <CardContent className="space-y-3 pb-4">
+      <CardContent className="space-y-3 px-3.5 pb-3.5">
         <div className="flex flex-wrap items-center gap-1.5">
           {evidencePipeline.map((step, index) => (
             <div key={step.id} className="flex items-center gap-1.5">
@@ -62,7 +62,7 @@ export function EvidenceScoring() {
           {metrics.map((metric) => (
             <div
               key={metric.label}
-              className="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface-muted)] p-2"
+              className="min-h-[78px] rounded-lg border border-[var(--color-border)] bg-[var(--color-surface-muted)] p-2.5"
             >
               <div className="text-[10px] text-[var(--color-ink-muted)]">{metric.label}</div>
               <div className={cn('mt-0.5 text-lg font-semibold', toneClass[metric.tone])}>
