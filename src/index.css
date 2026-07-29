@@ -1,0 +1,155 @@
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap');
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, monospace;
+
+  --color-background: #f4f7fb;
+  --color-surface: #ffffff;
+  --color-surface-muted: #eef3f9;
+  --color-border: #d7e0ec;
+  --color-border-strong: #b8c7da;
+
+  --color-ink: #0f1b2d;
+  --color-ink-secondary: #3d4f66;
+  --color-ink-muted: #6b7c92;
+
+  --color-brand: #1a5fbf;
+  --color-brand-hover: #154e9e;
+  --color-brand-soft: #e8f0fb;
+  --color-brand-ring: #3b82f6;
+
+  --color-success: #0f8a4c;
+  --color-success-soft: #e6f6ee;
+  --color-warning: #b45309;
+  --color-warning-soft: #fff7ed;
+  --color-danger: #b42318;
+  --color-danger-soft: #fef3f2;
+
+  --shadow-card: 0 1px 2px rgb(15 27 45 / 0.04), 0 8px 24px rgb(15 27 45 / 0.04);
+  --shadow-panel: 0 12px 40px rgb(15 27 45 / 0.08);
+}
+
+@layer base {
+  * {
+    box-sizing: border-box;
+  }
+
+  html,
+  body,
+  #root {
+    min-height: 100%;
+  }
+
+  body {
+    margin: 0;
+    font-family: var(--font-sans);
+    color: var(--color-ink);
+    background:
+      radial-gradient(ellipse 80% 50% at 0% 0%, rgb(26 95 191 / 0.06), transparent 55%),
+      radial-gradient(ellipse 60% 40% at 100% 0%, rgb(15 138 76 / 0.04), transparent 50%),
+      linear-gradient(180deg, #f7fafd 0%, var(--color-background) 40%, #eef2f7 100%);
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+
+  ::selection {
+    background: rgb(26 95 191 / 0.16);
+  }
+}
+
+@layer utilities {
+  .font-mono {
+    font-family: var(--font-mono);
+  }
+
+  .panel-grid {
+    background-image:
+      linear-gradient(rgb(26 95 191 / 0.04) 1px, transparent 1px),
+      linear-gradient(90deg, rgb(26 95 191 / 0.04) 1px, transparent 1px);
+    background-size: 24px 24px;
+  }
+
+  .status-pulse {
+    animation: status-pulse 2s ease-in-out infinite;
+  }
+
+  @keyframes status-pulse {
+    0%,
+    100% {
+      box-shadow: 0 0 0 0 rgb(15 138 76 / 0.45);
+    }
+    50% {
+      box-shadow: 0 0 0 6px rgb(15 138 76 / 0);
+    }
+  }
+
+  .flow-enter {
+    animation: flow-enter 0.5s ease-out both;
+  }
+
+  @keyframes flow-enter {
+    from {
+      opacity: 0;
+      transform: translateY(8px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  .react-flow__node {
+    font-family: var(--font-sans);
+  }
+
+  .react-flow__attribution {
+    display: none !important;
+  }
+
+  .attack-node-pulse {
+    animation: attack-node-pulse 1.8s ease-in-out infinite;
+  }
+
+  @keyframes attack-node-pulse {
+    0%,
+    100% {
+      box-shadow: 0 0 0 4px rgb(234 88 12 / 0.18);
+    }
+    50% {
+      box-shadow: 0 0 0 8px rgb(234 88 12 / 0.05);
+    }
+  }
+
+  .agent-marker-pulse {
+    animation: agent-marker-pulse 1.6s ease-in-out infinite;
+  }
+
+  @keyframes agent-marker-pulse {
+    0%,
+    100% {
+      box-shadow: 0 0 0 0 rgb(30 58 138 / 0.45);
+    }
+    50% {
+      box-shadow: 0 0 0 8px rgb(30 58 138 / 0);
+    }
+  }
+
+  .react-flow__edge.attack-path-edge .react-flow__edge-path {
+    stroke: #dc2626;
+    stroke-width: 3;
+    filter: drop-shadow(0 0 2px rgb(220 38 38 / 0.35));
+  }
+
+  .react-flow__edge.attack-path-edge .react-flow__edge-path {
+    stroke-dasharray: 8 6;
+    animation: attack-dash 0.8s linear infinite;
+  }
+
+  @keyframes attack-dash {
+    to {
+      stroke-dashoffset: -28;
+    }
+  }
+}
